@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>NdzeVpn</AssemblyName>
+    <RootNamespace>NdzeVpn</RootNamespace>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <Version>1.2.0</Version>
+    <Product>Ndze VPN</Product>
+    <Company>ndze</Company>
+    <Copyright>ndze</Copyright>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Required by the [LibraryImport] source generator (WinINET call in SystemProxyService). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+  </ItemGroup>
+
+  <!-- WinForms is only here for the tray icon; keep its types out of the global namespace so
+       Application/MessageBox/Color etc. resolve to WPF. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+    <Using Include="System.IO" />
+    <Using Include="System.Net.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\logo.png" />
+    <!-- Window, taskbar and tray icon (tray reads it through Application.GetResourceStream). -->
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+  <!-- Native sidecars (xray.exe, sing-box.exe, wintun.dll, geo assets) are
+       fetched by build\fetch-deps.ps1 into build\runtime and copied on build. -->
+  <ItemGroup>
+    <RuntimeAsset Include="$(MSBuildProjectDirectory)\..\..\build\runtime\**\*" />
+  </ItemGroup>
+
+  <Target Name="CopyRuntimeAssets" AfterTargets="Build">
+    <Copy SourceFiles="@(RuntimeAsset)"
+          DestinationFiles="@(RuntimeAsset->'$(OutDir)core\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'@(RuntimeAsset)' != ''" />
+  </Target>
+
+</Project>

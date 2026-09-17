@@ -1,0 +1,114 @@
+<UserControl x:Class="NdzeVpn.Views.SubscriptionsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:NdzeVpn.ViewModels">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="48,56,48,40" MaxWidth="760" HorizontalAlignment="Left">
+            <TextBlock Text="Подписки" Style="{StaticResource T.Title}" />
+            <TextBlock Style="{StaticResource T.Body}" FontSize="14" Margin="0,8,0,36" TextWrapping="Wrap"
+                       Text="Ссылки от Telegram-ботов, base64-подписки и отдельные ключи vless, vmess, trojan, ss." />
+
+            <!-- add subscription -->
+            <TextBlock Text="Новая подписка" Style="{StaticResource T.Label}" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="180" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Style="{StaticResource Input.Text}" Tag="https://…"
+                         Text="{Binding NewSubscriptionUrl, UpdateSourceTrigger=PropertyChanged}">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Enter" Command="{Binding AddSubscriptionCommand}" />
+                    </TextBox.InputBindings>
+                </TextBox>
+                <TextBox Grid.Column="1" Style="{StaticResource Input.Text}" Tag="Название" Margin="8,0"
+                         Text="{Binding NewSubscriptionName, UpdateSourceTrigger=PropertyChanged}" />
+                <Button Grid.Column="2" Style="{StaticResource Btn.Primary}" Content="Добавить" Command="{Binding AddSubscriptionCommand}" />
+            </Grid>
+
+            <!-- add keys -->
+            <Grid Margin="0,32,0,6">
+                <TextBlock Text="Ключи вручную" Style="{StaticResource T.Label}" Margin="0" />
+                <Button Style="{StaticResource Btn.Link}" Content="Из буфера обмена" HorizontalAlignment="Right" FontSize="12"
+                        Command="{Binding PasteFromClipboardCommand}" />
+            </Grid>
+            <TextBox Style="{StaticResource Input.Mono}" Height="96" AcceptsReturn="True" TextWrapping="Wrap"
+                     VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto"
+                     Tag="vless://uuid@host:443?security=reality&amp;…#Имя — по одному на строку"
+                     Text="{Binding ImportText, UpdateSourceTrigger=PropertyChanged}" />
+            <Button Style="{StaticResource Btn.Outline}" Content="Импортировать" HorizontalAlignment="Left" Margin="0,10,0,0"
+                    Command="{Binding ImportFromBoxCommand}" />
+
+            <!-- list -->
+            <Grid Margin="0,48,0,4">
+                <TextBlock Text="Добавленные" Style="{StaticResource T.Label}" Margin="0" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Style="{StaticResource Btn.Link}" Content="Сохранить" FontSize="12" Margin="0,0,16,0" Command="{Binding SaveSubscriptionsCommand}" />
+                    <Button Style="{StaticResource Btn.Link}" Content="Обновить все" FontSize="12" Command="{Binding UpdateAllSubscriptionsCommand}" />
+                </StackPanel>
+            </Grid>
+            <Rectangle Style="{StaticResource Line}" />
+
+            <TextBlock Text="Пока пусто" Style="{StaticResource T.Caption}" Margin="0,16"
+                       Visibility="{Binding HasSubscriptions, Converter={StaticResource BoolToVisInv}}" />
+
+            <ItemsControl ItemsSource="{Binding Subscriptions}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:SubscriptionItemViewModel}">
+                        <Border Style="{StaticResource Row}" Padding="0,18">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel Margin="0,0,220,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Ellipse Width="6" Height="6" Fill="{DynamicResource B.FgMuted}" Margin="0,0,10,0" VerticalAlignment="Center"
+                                                     Visibility="{Binding IsUpdating, Converter={StaticResource BoolToVis}}" />
+                                            <TextBox Style="{StaticResource Input.Inline}" FontSize="15" MinWidth="200"
+                                                     Text="{Binding Name, UpdateSourceTrigger=LostFocus}" />
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding StatusLine}" Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
+                                        <TextBlock Text="{Binding LastError}" Foreground="{DynamicResource B.Danger}" FontSize="12" Margin="0,4,0,0"
+                                                   TextWrapping="Wrap" Visibility="{Binding HasError, Converter={StaticResource BoolToVis}}" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,0,0">
+                                        <Button Style="{StaticResource Btn.Link}" Content="Серверы" Margin="0,0,16,0"
+                                                Command="{Binding DataContext.ShowSubscriptionServersCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                        <Button Style="{StaticResource Btn.Link}" Content="Обновить" Margin="0,0,16,0"
+                                                Command="{Binding DataContext.UpdateSubscriptionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                        <Button Style="{StaticResource Btn.Link}" Content="Удалить"
+                                                Command="{Binding DataContext.RemoveSubscriptionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBox Style="{StaticResource Input.Mono}" Margin="0,12,0,0" Text="{Binding Url, UpdateSourceTrigger=LostFocus}" />
+
+                                <WrapPanel Margin="0,12,0,0">
+                                    <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Enabled}" Margin="0,0,32,6">
+                                        <TextBlock Text="Включена" Style="{StaticResource T.Body}" />
+                                    </CheckBox>
+                                    <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding UpdateThroughProxy}" Margin="0,0,32,6">
+                                        <TextBlock Text="Обновлять через VPN" Style="{StaticResource T.Body}" />
+                                    </CheckBox>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,32,6">
+                                        <TextBlock Text="Автообновление, ч" Style="{StaticResource T.Body}" VerticalAlignment="Center" />
+                                        <TextBox Style="{StaticResource Input.Text}" Width="52" Margin="10,0,0,0" Padding="8,4"
+                                                 Text="{Binding AutoUpdateHours, Converter={StaticResource IntStr}}" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                        <TextBlock Text="User-Agent" Style="{StaticResource T.Body}" VerticalAlignment="Center" />
+                                        <TextBox Style="{StaticResource Input.Text}" Width="180" Margin="10,0,0,0" Padding="8,4" Tag="по умолчанию"
+                                                 Text="{Binding UserAgent}" />
+                                    </StackPanel>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

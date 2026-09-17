@@ -1,0 +1,66 @@
+<UserControl x:Class="NdzeVpn.Views.LogsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:NdzeVpn.ViewModels"
+             xmlns:svc="clr-namespace:NdzeVpn.Services">
+    <Grid Margin="48,56,40,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <TextBlock Text="Журнал" Style="{StaticResource T.Title}" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button Style="{StaticResource Btn.Link}" Content="Копировать" Margin="0,0,20,0" Command="{Binding CopyLogsCommand}" />
+                <Button Style="{StaticResource Btn.Link}" Content="Папка" Margin="0,0,20,0" Command="{Binding OpenLogsFolderCommand}" />
+                <Button Style="{StaticResource Btn.Link}" Content="Очистить" Command="{Binding ClearLogsCommand}" />
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="0,24,0,12">
+            <TextBox Style="{StaticResource Input.Text}" Width="300" HorizontalAlignment="Left" Tag="Фильтр: xray, error, discord…"
+                     Text="{Binding LogFilter, UpdateSourceTrigger=PropertyChanged, Delay=250}" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding LogAutoScroll}" Margin="0,0,28,0">
+                    <TextBlock Text="Автопрокрутка" Style="{StaticResource T.Body}" />
+                </CheckBox>
+                <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding LogShowDebug}">
+                    <TextBlock Text="Debug" Style="{StaticResource T.Body}" />
+                </CheckBox>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="2" BorderBrush="{DynamicResource B.Border}" BorderThickness="0,1,0,0" Padding="0,8,0,0">
+            <ListBox x:Name="LogList" Style="{StaticResource List.Plain}" ItemsSource="{Binding Logs}" Margin="-8,0"
+                     VirtualizingPanel.ScrollUnit="Pixel">
+                <ListBox.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:LogLineViewModel}">
+                        <Grid Margin="8,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="66" />
+                                <ColumnDefinition Width="50" />
+                                <ColumnDefinition Width="72" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding Time}" Style="{StaticResource T.Mono}" Foreground="{DynamicResource B.FgMuted}" />
+                            <TextBlock x:Name="lvl" Grid.Column="1" Text="{Binding Level}" Style="{StaticResource T.Mono}" Foreground="{DynamicResource B.FgMuted}" />
+                            <TextBlock Grid.Column="2" Text="{Binding Source}" Style="{StaticResource T.Mono}" />
+                            <TextBlock Grid.Column="3" Text="{Binding Message}" Style="{StaticResource T.Mono}" Foreground="{DynamicResource B.Fg}"
+                                       TextWrapping="Wrap" TextTrimming="None" />
+                        </Grid>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Severity}" Value="{x:Static svc:LogLevel.Error}">
+                                <Setter TargetName="lvl" Property="Foreground" Value="{DynamicResource B.Danger}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Severity}" Value="{x:Static svc:LogLevel.Warn}">
+                                <Setter TargetName="lvl" Property="Foreground" Value="{DynamicResource B.Warning}" />
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Border>
+    </Grid>
+</UserControl>

@@ -1,0 +1,315 @@
+<UserControl x:Class="NdzeVpn.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="clr-namespace:NdzeVpn.Controls">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="48,56,48,40" MaxWidth="760" HorizontalAlignment="Left">
+                <TextBlock Text="Настройки" Style="{StaticResource T.Title}" Margin="0,0,0,36" />
+
+                <!-- ================= appearance ================= -->
+                <!-- Swatch colours are literal: each tile previews its own theme, not the active one. -->
+                <TextBlock Text="Оформление" Style="{StaticResource T.Label}" />
+                <UniformGrid Columns="3" Margin="0,4,-10,0">
+                    <ctl:SelectButton Style="{StaticResource Card.Option}" Margin="0,0,10,0" Padding="12"
+                                      IsChecked="{Binding Theme, Converter={StaticResource EnumEq}, ConverterParameter=Graphite, Mode=OneWay}"
+                                      Command="{Binding SetThemeCommand}" CommandParameter="Graphite">
+                        <StackPanel>
+                            <Border Height="64" CornerRadius="6" Background="#0E0E0F" BorderBrush="#242427" BorderThickness="1">
+                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Orientation="Horizontal">
+                                    <Ellipse Width="22" Height="22" Stroke="#6EE7A8" StrokeThickness="1.5" />
+                                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                                        <Border Width="46" Height="5" CornerRadius="2" Background="#EDEDEF" />
+                                        <Border Width="30" Height="5" CornerRadius="2" Background="#5C5C62" Margin="0,4,0,0" HorizontalAlignment="Left" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="Graphite" Style="{StaticResource T.H3}" Margin="2,10,0,0" />
+                            <TextBlock Text="Тёмная" Style="{StaticResource T.Caption}" Margin="2,2,0,0" />
+                        </StackPanel>
+                    </ctl:SelectButton>
+                    <ctl:SelectButton Style="{StaticResource Card.Option}" Margin="0,0,10,0" Padding="12"
+                                      IsChecked="{Binding Theme, Converter={StaticResource EnumEq}, ConverterParameter=Paper, Mode=OneWay}"
+                                      Command="{Binding SetThemeCommand}" CommandParameter="Paper">
+                        <StackPanel>
+                            <Border Height="64" CornerRadius="6" Background="#F7F7F5" BorderBrush="#E4E4E0" BorderThickness="1">
+                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Orientation="Horizontal">
+                                    <Ellipse Width="22" Height="22" Stroke="#16A34A" StrokeThickness="1.5" />
+                                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                                        <Border Width="46" Height="5" CornerRadius="2" Background="#141414" />
+                                        <Border Width="30" Height="5" CornerRadius="2" Background="#A6A6A2" Margin="0,4,0,0" HorizontalAlignment="Left" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="Paper" Style="{StaticResource T.H3}" Margin="2,10,0,0" />
+                            <TextBlock Text="Светлая" Style="{StaticResource T.Caption}" Margin="2,2,0,0" />
+                        </StackPanel>
+                    </ctl:SelectButton>
+                    <ctl:SelectButton Style="{StaticResource Card.Option}" Margin="0,0,10,0" Padding="12"
+                                      IsChecked="{Binding Theme, Converter={StaticResource EnumEq}, ConverterParameter=Ink, Mode=OneWay}"
+                                      Command="{Binding SetThemeCommand}" CommandParameter="Ink">
+                        <StackPanel>
+                            <Border Height="64" CornerRadius="6" Background="#0A0C10" BorderBrush="#1C222C" BorderThickness="1">
+                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Orientation="Horizontal">
+                                    <Ellipse Width="22" Height="22" Stroke="#9DB8FF" StrokeThickness="1.5" />
+                                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                                        <Border Width="46" Height="5" CornerRadius="2" Background="#E4E8F0" />
+                                        <Border Width="30" Height="5" CornerRadius="2" Background="#4D5566" Margin="0,4,0,0" HorizontalAlignment="Left" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="Ink" Style="{StaticResource T.H3}" Margin="2,10,0,0" />
+                            <TextBlock Text="Синяя ночь" Style="{StaticResource T.Caption}" Margin="2,2,0,0" />
+                        </StackPanel>
+                    </ctl:SelectButton>
+                </UniformGrid>
+
+                <!-- ================= connection ================= -->
+                <TextBlock Text="Подключение" Style="{StaticResource T.Label}" Margin="0,40,0,6" />
+                <UniformGrid Columns="2" Margin="0,4,-10,0">
+                    <ctl:SelectButton Style="{StaticResource Card.Option}" Margin="0,0,10,0"
+                                      IsChecked="{Binding TunnelMode, Converter={StaticResource EnumEq}, ConverterParameter=SystemProxy, Mode=OneWay}"
+                                      Command="{Binding SetTunnelModeCommand}" CommandParameter="SystemProxy">
+                        <StackPanel>
+                            <TextBlock Text="Системный прокси" Style="{StaticResource T.H3}" FontWeight="SemiBold" />
+                            <TextBlock Text="Браузеры и программы. Без прав администратора" Style="{StaticResource T.Caption}" Margin="0,3,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ctl:SelectButton>
+                    <ctl:SelectButton Style="{StaticResource Card.Option}" Margin="0,0,10,0"
+                                      IsChecked="{Binding TunnelMode, Converter={StaticResource EnumEq}, ConverterParameter=Tun, Mode=OneWay}"
+                                      Command="{Binding SetTunnelModeCommand}" CommandParameter="Tun">
+                        <StackPanel>
+                            <TextBlock Text="TUN" Style="{StaticResource T.H3}" FontWeight="SemiBold" />
+                            <TextBlock Text="Весь компьютер: игры, голос Discord. Нужен админ" Style="{StaticResource T.Caption}" Margin="0,3,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ctl:SelectButton>
+                </UniformGrid>
+
+                <Rectangle Style="{StaticResource Line}" Margin="0,20,0,0" />
+                <Border Style="{StaticResource Row}">
+                    <Grid>
+                        <TextBlock Text="Порты SOCKS / HTTP / API" Style="{StaticResource Row.Label}" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <TextBox Style="{StaticResource Input.Mono}" Width="86" Padding="8,7" Text="{Binding Settings.SocksPort, Converter={StaticResource IntStr}}" />
+                            <TextBox Style="{StaticResource Input.Mono}" Width="86" Padding="8,7" Margin="6,0" Text="{Binding Settings.HttpPort, Converter={StaticResource IntStr}}" />
+                            <TextBox Style="{StaticResource Input.Mono}" Width="86" Padding="8,7" Text="{Binding Settings.ApiPort, Converter={StaticResource IntStr}}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Settings.AllowLanConnections}">
+                        <StackPanel>
+                            <TextBlock Text="Доступ из локальной сети" Style="{StaticResource Row.Label}" />
+                            <TextBlock Text="Телефон или консоль в той же Wi-Fi смогут использовать этот ПК как прокси" Style="{StaticResource T.Caption}" />
+                        </StackPanel>
+                    </CheckBox>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Settings.EnableUdp}">
+                        <TextBlock Text="UDP через SOCKS" Style="{StaticResource Row.Label}" />
+                    </CheckBox>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Settings.EnableSniffing}">
+                        <StackPanel>
+                            <TextBlock Text="Определять домен из TLS" Style="{StaticResource Row.Label}" />
+                            <TextBlock Text="Нужно для правил по доменам в TUN" Style="{StaticResource T.Caption}" />
+                        </StackPanel>
+                    </CheckBox>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <Grid>
+                        <TextBlock Text="TUN: адаптер / адрес / MTU" Style="{StaticResource Row.Label}" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <TextBox Style="{StaticResource Input.Mono}" Width="120" Text="{Binding Settings.TunInterfaceName}" />
+                            <TextBox Style="{StaticResource Input.Mono}" Width="120" Margin="6,0" Text="{Binding Settings.TunAddress}" />
+                            <TextBox Style="{StaticResource Input.Mono}" Width="76" Padding="8,7" Text="{Binding Settings.TunMtu, Converter={StaticResource IntStr}}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Settings.TunStrictRoute}">
+                        <StackPanel>
+                            <TextBlock Text="Strict route" Style="{StaticResource Row.Label}" />
+                            <TextBlock Text="Защита от утечек DNS в TUN" Style="{StaticResource T.Caption}" />
+                        </StackPanel>
+                    </CheckBox>
+                </Border>
+
+                <!-- ================= behaviour ================= -->
+                <TextBlock Text="Поведение" Style="{StaticResource T.Label}" Margin="0,40,0,6" />
+                <Rectangle Style="{StaticResource Line}" />
+                <Border Style="{StaticResource Row}">
+                    <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Settings.LaunchOnStartup}">
+                        <TextBlock Text="Запускать вместе с Windows" Style="{StaticResource Row.Label}" />
+                    </CheckBox>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Settings.StartMinimized}">
+                        <TextBlock Text="При автозапуске — сразу в трей" Style="{StaticResource Row.Label}" />
+                    </CheckBox>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Settings.AutoConnectOnLaunch}">
+                        <TextBlock Text="Подключаться при запуске" Style="{StaticResource Row.Label}" />
+                    </CheckBox>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Settings.CloseToTray}">
+                        <TextBlock Text="Закрытие окна сворачивает в трей" Style="{StaticResource Row.Label}" />
+                    </CheckBox>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Settings.MinimizeToTray}">
+                        <TextBlock Text="Сворачивание прячет в трей" Style="{StaticResource Row.Label}" />
+                    </CheckBox>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding AutoFailover}">
+                        <StackPanel>
+                            <TextBlock Text="Авто-переключение сервера" Style="{StaticResource Row.Label}" />
+                            <TextBlock Text="Если текущий перестал отвечать — на самый быстрый живой" Style="{StaticResource T.Caption}" />
+                        </StackPanel>
+                    </CheckBox>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <Grid>
+                        <TextBlock Text="Проверка соединения, сек" Style="{StaticResource Row.Label}" />
+                        <TextBox Style="{StaticResource Input.Mono}" Width="72" HorizontalAlignment="Right"
+                                 Text="{Binding Settings.FailoverCheckSeconds, Converter={StaticResource IntStr}}" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <Grid>
+                        <TextBlock Text="Таймаут пинга, мс" Style="{StaticResource Row.Label}" />
+                        <TextBox Style="{StaticResource Input.Mono}" Width="72" HorizontalAlignment="Right"
+                                 Text="{Binding Settings.LatencyTimeoutMs, Converter={StaticResource IntStr}}" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <Grid>
+                        <TextBlock Text="URL замера задержки" Style="{StaticResource Row.Label}" />
+                        <TextBox Style="{StaticResource Input.Mono}" Width="300" HorizontalAlignment="Right" Text="{Binding Settings.LatencyTestUrl}" />
+                    </Grid>
+                </Border>
+
+                <!-- ================= discord ================= -->
+                <TextBlock Text="Интеграции" Style="{StaticResource T.Label}" Margin="0,40,0,6" />
+                <Rectangle Style="{StaticResource Line}" />
+                <Border Style="{StaticResource Row}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource I.Chat}" StrokeThickness="1.7"
+                              Stroke="{DynamicResource B.FgSecondary}" Margin="0,0,14,0" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="Активность в Discord" Style="{StaticResource Row.Label}" />
+                            <TextBlock Text="{Binding DiscordSummary}" Style="{StaticResource T.Caption}" />
+                        </StackPanel>
+                        <Button Grid.Column="2" Style="{StaticResource Btn.Outline}" Content="Настроить" Padding="14,7"
+                                VerticalAlignment="Center" Command="{Binding OpenDiscordSettingsCommand}" />
+                    </Grid>
+                </Border>
+
+                <!-- ================= updates ================= -->
+                <TextBlock Text="Обновления" Style="{StaticResource T.Label}" Margin="0,40,0,6" />
+                <Rectangle Style="{StaticResource Line}" />
+                <Border Style="{StaticResource Row}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource I.Download}" StrokeThickness="1.7"
+                              Stroke="{DynamicResource B.FgSecondary}" Margin="0,0,14,0" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Row.Label}">
+                                <Run Text="Версия" /> <Run Text="{Binding AppVersion, Mode=OneWay}" />
+                            </TextBlock>
+                            <TextBlock Style="{StaticResource T.Caption}" Text="{Binding UpdateStatus}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Style="{StaticResource Btn.Primary}" Content="Обновить" Padding="14,7" Margin="0,0,8,0"
+                                    Command="{Binding OpenUpdateWindowCommand}"
+                                    Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVis}}" />
+                            <Button Style="{StaticResource Btn.Outline}" Content="Проверить" Padding="14,7"
+                                    Command="{Binding CheckForUpdatesCommand}"
+                                    IsEnabled="{Binding IsCheckingUpdate, Converter={StaticResource InvBool}}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Settings.CheckUpdatesOnStartup}">
+                        <TextBlock Text="Проверять обновления при запуске" Style="{StaticResource Row.Label}" />
+                    </CheckBox>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <Grid>
+                        <TextBlock Text="Исходный код и релизы" Style="{StaticResource Row.Label}" />
+                        <Button Style="{StaticResource Btn.Link}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Command="{Binding OpenRepositoryCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding RepositoryUrl}" FontSize="13" />
+                                <Path Style="{StaticResource Icon.Xs}" Data="{StaticResource I.External}" Margin="6,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- ================= data ================= -->
+                <TextBlock Text="Базы правил" Style="{StaticResource T.Label}" Margin="0,40,0,6" />
+                <Rectangle Style="{StaticResource Line}" />
+                <Border Style="{StaticResource Row}">
+                    <Grid>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,300,0">
+                            <TextBlock Text="Источник" Style="{StaticResource Row.Label}" />
+                            <TextBlock Text="{Binding GeoStatus}" Style="{StaticResource T.Caption}" TextWrapping="Wrap" TextTrimming="None" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <ComboBox Style="{StaticResource Combo}" MinWidth="200" ItemsSource="{Binding GeoSources}" DisplayMemberPath="Label"
+                                      SelectedValuePath="Value" SelectedValue="{Binding Settings.GeoAssetSource}" />
+                            <Button Style="{StaticResource Btn.Outline}" Content="Обновить" Margin="8,0,0,0" Padding="12,7"
+                                    Command="{Binding UpdateGeoCommand}" IsEnabled="{Binding IsUpdatingGeo, Converter={StaticResource InvBool}}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Settings.AutoUpdateGeoAssets}">
+                        <TextBlock Text="Обновлять автоматически раз в 3 дня" Style="{StaticResource Row.Label}" />
+                    </CheckBox>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <Grid>
+                        <TextBlock Text="Уровень логов Xray" Style="{StaticResource Row.Label}" />
+                        <ComboBox Style="{StaticResource Combo}" HorizontalAlignment="Right" ItemsSource="{Binding LogLevels}" DisplayMemberPath="Label"
+                                  SelectedValuePath="Value" SelectedValue="{Binding Settings.XrayLogLevel}" />
+                    </Grid>
+                </Border>
+
+                <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
+                    <Button Style="{StaticResource Btn.Link}" Content="Папка данных" Margin="0,0,20,0" Command="{Binding OpenDataFolderCommand}" />
+                    <Button Style="{StaticResource Btn.Link}" Content="Папка логов" Command="{Binding OpenLogsFolderCommand}" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource T.Caption}" Margin="0,24,0,0"><Run Text="ndze vpn" /> <Run Text="{Binding AppVersion, Mode=OneWay}" /><Run Text=" · Xray-core · sing-box + wintun" /></TextBlock>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="1" Style="{StaticResource ApplyBar}">
+            <Grid>
+                <TextBlock Style="{StaticResource T.Caption}" VerticalAlignment="Center"
+                           Text="Тема меняется сразу, остальное — по «Применить»" />
+                <Button Style="{StaticResource Btn.Primary}" Content="Применить" HorizontalAlignment="Right" Command="{Binding ApplyCommand}" />
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

@@ -1,0 +1,31 @@
+<!-- Ink: blue-black with a pale periwinkle accent. -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="B.Window" Color="#0A0C10" />
+    <SolidColorBrush x:Key="B.Panel" Color="#0F1218" />
+    <SolidColorBrush x:Key="B.Card" Color="#12161D" />
+    <SolidColorBrush x:Key="B.Elevated" Color="#161B23" />
+    <SolidColorBrush x:Key="B.Hover" Color="#121620" />
+    <SolidColorBrush x:Key="B.Pressed" Color="#1C2230" />
+    <SolidColorBrush x:Key="B.Border" Color="#1C222C" />
+    <SolidColorBrush x:Key="B.Input" Color="#0D1016" />
+
+    <SolidColorBrush x:Key="B.Fg" Color="#E4E8F0" />
+    <SolidColorBrush x:Key="B.FgSecondary" Color="#8590A3" />
+    <SolidColorBrush x:Key="B.FgMuted" Color="#4D5566" />
+
+    <SolidColorBrush x:Key="B.Accent" Color="#9DB8FF" />
+    <SolidColorBrush x:Key="B.AccentHover" Color="#B8CCFF" />
+    <SolidColorBrush x:Key="B.AccentFg" Color="#0A0C10" />
+
+    <SolidColorBrush x:Key="B.Success" Color="#7DD3C0" />
+    <SolidColorBrush x:Key="B.SuccessSoft" Color="#7DD3C0" Opacity="0.10" />
+    <SolidColorBrush x:Key="B.Danger" Color="#FF8A8A" />
+    <SolidColorBrush x:Key="B.Warning" Color="#F5C66B" />
+    <SolidColorBrush x:Key="B.Info" Color="#9DB8FF" />
+
+    <FontFamily x:Key="F.Main">Segoe UI Variable Text, Segoe UI</FontFamily>
+    <CornerRadius x:Key="R.Panel">12</CornerRadius>
+    <CornerRadius x:Key="R.Card">8</CornerRadius>
+    <CornerRadius x:Key="R.Pill">500</CornerRadius>
+</ResourceDictionary>

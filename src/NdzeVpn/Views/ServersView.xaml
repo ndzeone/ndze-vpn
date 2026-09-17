@@ -1,0 +1,136 @@
+<UserControl x:Class="NdzeVpn.Views.ServersView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:NdzeVpn.ViewModels"
+             xmlns:ctl="clr-namespace:NdzeVpn.Controls">
+
+    <Grid Margin="48,56,40,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
+                <TextBlock Text="Серверы" Style="{StaticResource T.Title}" />
+                <TextBlock Text="{Binding Servers.Count}" Style="{StaticResource T.Caption}" FontSize="14"
+                           VerticalAlignment="Bottom" Margin="10,0,0,5" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button Style="{StaticResource Btn.Link}" Command="{Binding TestPingCommand}" Margin="0,0,20,0" ToolTip="F5">
+                    <TextBlock>
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="Проверить пинг" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsTesting}" Value="True">
+                                        <Setter Property="Text" Value="Остановить" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Button>
+                <Button Style="{StaticResource Btn.Link}" Content="Обновить подписки" Command="{Binding UpdateAllSubscriptionsCommand}" Margin="0,0,20,0" />
+                <Button Style="{StaticResource Btn.Outline}" Content="Вставить ключ" Command="{Binding PasteFromClipboardCommand}" />
+            </StackPanel>
+        </Grid>
+
+        <TextBox Grid.Row="1" Style="{StaticResource Input.Text}" Margin="0,24,0,0"
+                 Tag="Поиск — или вставь сюда ключ / ссылку на подписку и нажми Enter"
+                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}">
+            <TextBox.InputBindings>
+                <KeyBinding Key="Enter" Command="{Binding SubmitSearchCommand}" />
+            </TextBox.InputBindings>
+        </TextBox>
+
+        <Grid Grid.Row="2" Margin="0,20,0,10">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <ctl:SelectButton Style="{StaticResource Chip.Toggle}" Content="Все" Click="Chip_Click" Tag="all"
+                                  IsChecked="{Binding ServerFilter, Converter={StaticResource EnumEq}, ConverterParameter=all, Mode=OneWay}" />
+                <ctl:SelectButton Style="{StaticResource Chip.Toggle}" Content="VLESS" Click="Chip_Click" Tag="vless"
+                                  IsChecked="{Binding ServerFilter, Converter={StaticResource EnumEq}, ConverterParameter=vless, Mode=OneWay}" />
+                <ctl:SelectButton Style="{StaticResource Chip.Toggle}" Content="Reality" Click="Chip_Click" Tag="reality"
+                                  IsChecked="{Binding ServerFilter, Converter={StaticResource EnumEq}, ConverterParameter=reality, Mode=OneWay}" />
+                <ctl:SelectButton Style="{StaticResource Chip.Toggle}" Content="Отвечают" Click="Chip_Click" Tag="alive"
+                                  IsChecked="{Binding ServerFilter, Converter={StaticResource EnumEq}, ConverterParameter=alive, Mode=OneWay}" />
+                <ctl:SelectButton Style="{StaticResource Chip.Toggle}" Content="Мои ключи" Click="Chip_Click" Tag="manual"
+                                  IsChecked="{Binding ServerFilter, Converter={StaticResource EnumEq}, ConverterParameter=manual, Mode=OneWay}" />
+            </StackPanel>
+            <ComboBox Style="{StaticResource Combo}" HorizontalAlignment="Right" MinWidth="150" SelectedValuePath="Tag"
+                      SelectedValue="{Binding ServerSort}">
+                <ComboBoxItem Content="Как добавлены" Tag="default" />
+                <ComboBoxItem Content="По пингу" Tag="ping" />
+                <ComboBoxItem Content="По имени" Tag="name" />
+            </ComboBox>
+        </Grid>
+
+        <ListBox Grid.Row="3" Style="{StaticResource List.Plain}" ItemsSource="{Binding ServersView}" Margin="-12,0,-12,0"
+                 SelectedItem="{Binding SelectedServer}"
+                 MouseDoubleClick="List_MouseDoubleClick" KeyDown="List_KeyDown">
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:ServerItemViewModel}">
+                    <Grid Height="50" Margin="12,0" Background="Transparent">
+                        <Grid.Tag>
+                            <Binding Path="DataContext" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                        </Grid.Tag>
+                        <Grid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Подключиться" Command="{Binding PlacementTarget.Tag.ConnectToCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding}" />
+                                <MenuItem Header="Переименовать" Command="{Binding PlacementTarget.Tag.RenameServerCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding}" />
+                                <MenuItem Header="Скопировать ссылку" Command="{Binding PlacementTarget.Tag.CopyServerLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding}" />
+                                <MenuItem Header="Удалить" Command="{Binding PlacementTarget.Tag.RemoveServerCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="{Binding}" />
+                            </ContextMenu>
+                        </Grid.ContextMenu>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="20" />
+                            <ColumnDefinition Width="36" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="170" />
+                            <ColumnDefinition Width="160" />
+                            <ColumnDefinition Width="70" />
+                            <ColumnDefinition Width="34" />
+                        </Grid.ColumnDefinitions>
+
+                        <Ellipse x:Name="dot" Width="6" Height="6" Fill="{DynamicResource B.Success}" HorizontalAlignment="Left"
+                                 Visibility="Hidden" />
+                        <TextBlock Grid.Column="1" Text="{Binding CountryCode}" Style="{StaticResource T.Mono}" VerticalAlignment="Center" />
+                        <TextBlock x:Name="name" Grid.Column="2" Text="{Binding CleanName}" Style="{StaticResource T.H3}"
+                                   VerticalAlignment="Center" Margin="0,0,16,0" />
+                        <TextBlock Grid.Column="3" Text="{Binding Protocol}" Style="{StaticResource T.Body}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="4" Text="{Binding Transport}" Style="{StaticResource T.Caption}" FontSize="13"
+                                   VerticalAlignment="Center" ToolTip="{Binding Address}" />
+                        <Grid Grid.Column="5" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding LatencyMs, Converter={StaticResource LatencyText}}"
+                                       Foreground="{Binding LatencyMs, Converter={StaticResource LatencyBrush}}" FontSize="13"
+                                       Visibility="{Binding IsTesting, Converter={StaticResource BoolToVisInv}}" />
+                            <TextBlock Text="…" Style="{StaticResource T.Caption}"
+                                       Visibility="{Binding IsTesting, Converter={StaticResource BoolToVis}}" />
+                        </Grid>
+                        <Button x:Name="more" Grid.Column="6" Style="{StaticResource Btn.Icon}" Width="26" Height="26"
+                                HorizontalAlignment="Right" Visibility="Hidden" Click="More_Click">
+                            <Path Style="{StaticResource Icon.Sm}" Data="{StaticResource I.More}" StrokeThickness="3.4" />
+                        </Button>
+                    </Grid>
+                    <DataTemplate.Triggers>
+                        <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                            <Setter TargetName="more" Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsActive}" Value="True">
+                            <Setter TargetName="dot" Property="Visibility" Value="Visible" />
+                            <Setter TargetName="name" Property="FontWeight" Value="SemiBold" />
+                        </DataTrigger>
+                    </DataTemplate.Triggers>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <StackPanel Grid.Row="3" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Visibility="{Binding HasServers, Converter={StaticResource BoolToVisInv}}">
+            <TextBlock Text="Серверов пока нет" Style="{StaticResource T.H2}" HorizontalAlignment="Center" />
+            <TextBlock Text="Вставь ключ в поле выше или добавь подписку" Style="{StaticResource T.Body}" HorizontalAlignment="Center" Margin="0,6,0,0" />
+        </StackPanel>
+    </Grid>
+</UserControl>

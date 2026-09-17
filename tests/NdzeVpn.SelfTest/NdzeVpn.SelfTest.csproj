@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Links the app's Models/Services sources directly so the checks run against the real code
+       without a WPF host. Run: dotnet run -c Release -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\NdzeVpn\Models\*.cs" LinkBase="Models" />
+    <Compile Include="..\..\src\NdzeVpn\Services\*.cs" LinkBase="Services" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <RuntimeAsset Include="$(MSBuildProjectDirectory)\..\..\build\runtime\**\*" />
+  </ItemGroup>
+
+  <Target Name="CopyRuntimeAssets" AfterTargets="Build">
+    <Copy SourceFiles="@(RuntimeAsset)" DestinationFolder="$(OutDir)core" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

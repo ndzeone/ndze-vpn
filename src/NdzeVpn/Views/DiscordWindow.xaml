@@ -1,0 +1,239 @@
+<Window x:Class="NdzeVpn.Views.DiscordWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Активность в Discord — Ndze VPN" Icon="/Assets/app.ico"
+        Width="900" Height="720" MinWidth="760" MinHeight="520"
+        WindowStartupLocation="CenterOwner" WindowStyle="None" ResizeMode="CanResize" ShowInTaskbar="True"
+        Background="{DynamicResource B.Window}" Foreground="{DynamicResource B.Fg}"
+        FontFamily="{DynamicResource F.Main}" UseLayoutRounding="True" TextOptions.TextFormattingMode="Ideal">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="48" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0"
+                      UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
+    <Border BorderBrush="{DynamicResource B.Border}" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- ============================================================ header -->
+            <Grid Height="48">
+                <StackPanel Orientation="Horizontal" Margin="24,0,0,0" VerticalAlignment="Center">
+                    <Path Style="{StaticResource Icon}" Data="{StaticResource I.Chat}" StrokeThickness="1.7"
+                          Stroke="{DynamicResource B.FgSecondary}" />
+                    <TextBlock Text="Активность в Discord" Style="{StaticResource T.H2}" Margin="10,0,0,0" VerticalAlignment="Center" />
+                    <Ellipse Width="6" Height="6" Margin="16,1,6,0" VerticalAlignment="Center">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="{DynamicResource B.FgMuted}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DiscordConnected}" Value="True">
+                                        <Setter Property="Fill" Value="{DynamicResource B.Success}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <TextBlock VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource T.Caption}">
+                                <Setter Property="Text" Value="Discord не найден" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DiscordConnected}" Value="True">
+                                        <Setter Property="Text" Value="подключено к Discord" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+                <Button Style="{StaticResource Btn.CaptionClose}" HorizontalAlignment="Right" VerticalAlignment="Top" Height="48"
+                        Click="Close_Click">
+                    <Path Style="{StaticResource Icon.Caption}" Data="{StaticResource I.WinClose}" />
+                </Button>
+            </Grid>
+
+            <!-- ============================================================ body -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="340" />
+                </Grid.ColumnDefinitions>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="24,8,28,28">
+                        <Border Style="{StaticResource Row}" Padding="0,0,0,14">
+                            <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Discord.Enabled}">
+                                <StackPanel>
+                                    <TextBlock Text="Показывать активность" Style="{StaticResource Row.Label}" />
+                                    <TextBlock Text="Карточка в профиле, пока VPN подключён" Style="{StaticResource T.Caption}" />
+                                </StackPanel>
+                            </CheckBox>
+                        </Border>
+
+                        <!-- application -->
+                        <TextBlock Text="Приложение" Style="{StaticResource T.Label}" Margin="0,24,0,8" />
+                        <Grid>
+                            <TextBlock Text="Application ID" Style="{StaticResource T.Caption}" />
+                            <Button Style="{StaticResource Btn.Link}" FontSize="12" HorizontalAlignment="Right"
+                                    Command="{Binding OpenDiscordPortalCommand}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Создать приложение" />
+                                    <Path Style="{StaticResource Icon.Xs}" Data="{StaticResource I.External}" Margin="5,0,0,0" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                        <TextBox Style="{StaticResource Input.Mono}" Margin="0,6,0,0" Tag="1287471234567890123"
+                                 Text="{Binding Discord.ApplicationId, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource T.Caption}" TextWrapping="Wrap" Margin="0,6,0,0" TextTrimming="None"
+                                   Text="discord.com/developers → New Application → скопируй Application ID. Имя приложения станет текстом «Слушает …». Картинки загружать не нужно — они берутся с GitHub." />
+
+                        <!-- card -->
+                        <TextBlock Text="Карточка" Style="{StaticResource T.Label}" Margin="0,28,0,8" />
+                        <UniformGrid Columns="2" Margin="0,0,-10,0">
+                            <StackPanel Margin="0,0,10,0">
+                                <TextBlock Text="Тип" Style="{StaticResource T.Caption}" Margin="0,0,0,6" />
+                                <ComboBox Style="{StaticResource Combo}" MinWidth="0" ItemsSource="{Binding DiscordActivityTypes}"
+                                          DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Discord.ActivityType}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,10,0">
+                                <TextBlock Text="Цикл полосы, мин" Style="{StaticResource T.Caption}" Margin="0,0,0,6" />
+                                <TextBox Style="{StaticResource Input.Mono}" Text="{Binding Discord.ProgressCycleMinutes, Converter={StaticResource IntStr}}" />
+                            </StackPanel>
+                        </UniformGrid>
+
+                        <TextBlock Text="Строка 1" Style="{StaticResource T.Caption}" Margin="0,14,0,6" />
+                        <TextBox Style="{StaticResource Input.Mono}" Text="{Binding Discord.DetailsTemplate, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Text="Строка 2" Style="{StaticResource T.Caption}" Margin="0,10,0,6" />
+                        <TextBox Style="{StaticResource Input.Mono}" Text="{Binding Discord.StateTemplate, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource T.Caption}" Margin="0,6,0,0" TextWrapping="Wrap" TextTrimming="None"
+                                   Text="{}{server} {protocol} {mode} {routing} {ping} {up} {down} {total}" FontFamily="{StaticResource F.Mono}" />
+
+                        <UniformGrid Columns="2" Margin="0,14,-10,0">
+                            <StackPanel Margin="0,0,10,0">
+                                <TextBlock Text="Большая картинка" Style="{StaticResource T.Caption}" Margin="0,0,0,6" />
+                                <TextBox Style="{StaticResource Input.Mono}" Tag="logo или https://…" Text="{Binding Discord.LargeImageKey}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,10,0">
+                                <TextBlock Text="Маленькая картинка" Style="{StaticResource T.Caption}" Margin="0,0,0,6" />
+                                <TextBox Style="{StaticResource Input.Mono}" Tag="shield или https://…" Text="{Binding Discord.SmallImageKey}" />
+                            </StackPanel>
+                        </UniformGrid>
+
+                        <!-- what to show -->
+                        <TextBlock Text="Что показывать" Style="{StaticResource T.Label}" Margin="0,28,0,0" />
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Discord.ShowServerName}">
+                                <TextBlock Text="Имя сервера" Style="{StaticResource Row.Label}" />
+                            </CheckBox>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Discord.ShowElapsed}">
+                                <TextBlock Text="Время сессии" Style="{StaticResource Row.Label}" />
+                            </CheckBox>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Discord.ShowProgressBar}">
+                                <TextBlock Text="Полоса прогресса" Style="{StaticResource Row.Label}" />
+                            </CheckBox>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Discord.ShowSpeed}">
+                                <TextBlock Text="Скорость в {up} / {down}" Style="{StaticResource Row.Label}" />
+                            </CheckBox>
+                        </Border>
+                        <Border Style="{StaticResource Row}">
+                            <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Discord.ShowWhenDisconnected}">
+                                <TextBlock Text="Показывать, когда VPN отключён" Style="{StaticResource Row.Label}" />
+                            </CheckBox>
+                        </Border>
+                        <Border Style="{StaticResource Row}" BorderThickness="0">
+                            <StackPanel>
+                                <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Discord.ShowButtons}">
+                                    <TextBlock Text="Кнопка под карточкой" Style="{StaticResource Row.Label}" />
+                                </CheckBox>
+                                <UniformGrid Columns="2" Margin="0,10,-8,0">
+                                    <TextBox Style="{StaticResource Input.Text}" Margin="0,0,8,0" Tag="Текст" Text="{Binding Discord.Button1Label}" />
+                                    <TextBox Style="{StaticResource Input.Mono}" Margin="0,0,8,0" Tag="ссылка (пусто — GitHub проекта)" Text="{Binding Discord.Button1Url}" />
+                                </UniformGrid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ============================================================ preview -->
+                <!-- Discord's own palette on purpose: this imitates how the card renders there. -->
+                <Border Grid.Column="1" BorderBrush="{DynamicResource B.Border}" BorderThickness="1,0,0,0" Background="{DynamicResource B.Panel}">
+                    <StackPanel Margin="24,12,24,24">
+                        <TextBlock Text="Так увидят в профиле" Style="{StaticResource T.Label}" Margin="0,0,0,10" />
+                        <Border Background="#232428" CornerRadius="10" Padding="14">
+                            <StackPanel>
+                                <TextBlock Text="{Binding DiscordPreviewHeader}" Foreground="#B5BAC1" FontSize="12" FontWeight="SemiBold" />
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="76" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Width="76" Height="76">
+                                        <Border CornerRadius="8">
+                                            <Border.Background>
+                                                <ImageBrush ImageSource="/Assets/logo.png" Stretch="UniformToFill" />
+                                            </Border.Background>
+                                        </Border>
+                                        <Border Width="24" Height="24" CornerRadius="12" Background="#232428" Padding="2"
+                                                HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-5,-5"
+                                                Visibility="{Binding IsConnected, Converter={StaticResource BoolToVis}}">
+                                            <Border CornerRadius="10" Background="#F2F2F4">
+                                                <Path Style="{StaticResource Icon.Xs}" Data="{StaticResource I.Power}" Stroke="#111113" />
+                                            </Border>
+                                        </Border>
+                                    </Grid>
+                                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding DiscordPreviewDetails}" Foreground="#F2F3F5" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding DiscordPreviewState}" Foreground="#B5BAC1" FontSize="12.5" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                        <Grid Margin="0,8,0,0" Visibility="{Binding Discord.ShowElapsed, Converter={StaticResource BoolToVis}}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding ElapsedText}" Foreground="#B5BAC1" FontSize="10.5" />
+                                            <ProgressBar Grid.Column="1" Style="{StaticResource Progress.Thin}" Margin="6,0" Maximum="100" Height="3"
+                                                         Value="{Binding SessionProgress, Mode=OneWay}" Foreground="#DBDEE1" Background="#4E5058"
+                                                         Visibility="{Binding Discord.ShowProgressBar, Converter={StaticResource BoolToVis}}" />
+                                            <TextBlock Grid.Column="2" Text="{Binding CycleEndText}" Foreground="#B5BAC1" FontSize="10.5"
+                                                       Visibility="{Binding Discord.ShowProgressBar, Converter={StaticResource BoolToVis}}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Grid>
+                                <Border Background="#2E3035" CornerRadius="6" Padding="10,7" Margin="0,12,0,0"
+                                        Visibility="{Binding Discord.ShowButtons, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{Binding Discord.Button1Label}" Foreground="#DBDEE1" FontSize="12.5" HorizontalAlignment="Center" />
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Style="{StaticResource T.Caption}" TextWrapping="Wrap" TextTrimming="None" Margin="0,14,0,0" LineHeight="18"
+                                   Text="Карточка видна другим, только когда десктопный Discord запущен на этом ПК и в его настройках включено «Отображать текущую активность»." />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ============================================================ footer -->
+            <Border Grid.Row="2" BorderBrush="{DynamicResource B.Border}" BorderThickness="0,1,0,0" Padding="24,12">
+                <Grid>
+                    <TextBlock Style="{StaticResource T.Caption}" VerticalAlignment="Center"
+                               Text="Превью обновляется сразу, в Discord — после «Сохранить»" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource Btn.Outline}" Content="Закрыть" Margin="0,0,10,0" Click="Close_Click" />
+                        <Button Style="{StaticResource Btn.Primary}" Content="Сохранить" Command="{Binding SaveDiscordCommand}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

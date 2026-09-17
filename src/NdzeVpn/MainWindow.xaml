@@ -1,0 +1,194 @@
+<Window x:Class="NdzeVpn.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:NdzeVpn.ViewModels"
+        xmlns:ctl="clr-namespace:NdzeVpn.Controls"
+        xmlns:views="clr-namespace:NdzeVpn.Views"
+        xmlns:svc="clr-namespace:NdzeVpn.Services"
+        Title="Ndze VPN" Icon="/Assets/app.ico" Width="1180" Height="760" MinWidth="900" MinHeight="600"
+        WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
+        Background="{DynamicResource B.Window}" Foreground="{DynamicResource B.Fg}"
+        FontFamily="{DynamicResource F.Main}" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Ideal">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="40" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0"
+                      UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
+    <Window.InputBindings>
+        <KeyBinding Key="Space" Modifiers="Control" Command="{Binding ToggleConnectionCommand}" />
+        <KeyBinding Key="V" Modifiers="Control+Shift" Command="{Binding PasteFromClipboardCommand}" />
+        <KeyBinding Key="Right" Modifiers="Alt" Command="{Binding GoForwardCommand}" />
+        <KeyBinding Key="Left" Modifiers="Alt" Command="{Binding GoBackCommand}" />
+        <KeyBinding Key="F5" Command="{Binding TestPingCommand}" />
+    </Window.InputBindings>
+
+    <Grid x:Name="Root">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ============================================================ sidebar -->
+        <!-- Width animates between 212 and 64 on IsSidebarCollapsed; labels hide via the Nav templates. -->
+        <Border BorderBrush="{DynamicResource B.Border}" BorderThickness="0,0,1,0" ClipToBounds="True">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Width" Value="212" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Width" To="64" Duration="0:0:0.18">
+                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+                            <DataTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Width" To="212" Duration="0:0:0.18">
+                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.ExitActions>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+
+            <Grid Margin="10,14,10,18">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- header: collapse toggle + wordmark -->
+                <StackPanel Orientation="Horizontal" Height="40">
+                    <Button Style="{StaticResource Btn.Icon}" Width="44" Height="36" Command="{Binding ToggleSidebarCommand}"
+                            WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button.ToolTip>
+                            <ToolTip>
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="Свернуть панель" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
+                                                    <Setter Property="Text" Value="Развернуть панель" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </ToolTip>
+                        </Button.ToolTip>
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource I.Sidebar}" StrokeThickness="1.7" />
+                    </Button>
+                    <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource B.Fg}" VerticalAlignment="Center" Margin="8,0,0,1"
+                               Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource BoolToVisInv}}">
+                        <Run Text="ndze" /><Run Text=" vpn" Foreground="{DynamicResource B.FgMuted}" FontWeight="Normal" />
+                    </TextBlock>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Margin="0,28,0,0">
+                    <ctl:SelectButton Style="{StaticResource Nav.Item}" Content="Подключение" Tag="{StaticResource I.Power}"
+                                      IsChecked="{Binding CurrentPage, Converter={StaticResource EnumEq}, ConverterParameter=Home, Mode=OneWay}"
+                                      Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Page.Home}" />
+                    <ctl:SelectButton Style="{StaticResource Nav.Item}" Content="Серверы" Tag="{StaticResource I.Globe}"
+                                      IsChecked="{Binding CurrentPage, Converter={StaticResource EnumEq}, ConverterParameter=Servers, Mode=OneWay}"
+                                      Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Page.Servers}" />
+                    <ctl:SelectButton Style="{StaticResource Nav.Item}" Content="Подписки" Tag="{StaticResource I.Inbox}"
+                                      IsChecked="{Binding CurrentPage, Converter={StaticResource EnumEq}, ConverterParameter=Subscriptions, Mode=OneWay}"
+                                      Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Page.Subscriptions}" />
+                    <ctl:SelectButton Style="{StaticResource Nav.Item}" Content="Маршруты" Tag="{StaticResource I.Route}"
+                                      IsChecked="{Binding CurrentPage, Converter={StaticResource EnumEq}, ConverterParameter=Routing, Mode=OneWay}"
+                                      Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Page.Routing}" />
+                    <ctl:SelectButton Style="{StaticResource Nav.Item}" Content="Настройки" Tag="{StaticResource I.Sliders}"
+                                      IsChecked="{Binding CurrentPage, Converter={StaticResource EnumEq}, ConverterParameter=Settings, Mode=OneWay}"
+                                      Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Page.Settings}" />
+                    <ctl:SelectButton Style="{StaticResource Nav.Item}" Content="Журнал" Tag="{StaticResource I.Doc}"
+                                      IsChecked="{Binding CurrentPage, Converter={StaticResource EnumEq}, ConverterParameter=Logs, Mode=OneWay}"
+                                      Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Page.Logs}" />
+                    <Rectangle Style="{StaticResource Line}" Margin="12,12" />
+                    <Button Style="{StaticResource Nav.Action}" Content="Discord" Tag="{StaticResource I.Chat}"
+                            Command="{Binding OpenDiscordSettingsCommand}" />
+                </StackPanel>
+
+                <!-- new version on GitHub -->
+                <Button Grid.Row="2" Style="{StaticResource Nav.Action}" Tag="{StaticResource I.Download}" Margin="0,0,0,14"
+                        Foreground="{DynamicResource B.Success}" Command="{Binding OpenUpdateWindowCommand}"
+                        Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVis}}">
+                    <TextBlock>
+                        <Run Text="Обновить до" /> <Run Text="{Binding AvailableUpdate.Version, Mode=OneWay, StringFormat={}{0}}" />
+                    </TextBlock>
+                </Button>
+
+                <!-- footer: status; collapses to a single dot -->
+                <Grid Grid.Row="3" Margin="14,0,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Ellipse Width="8" Height="8" VerticalAlignment="Top" Margin="5,6,12,0" ToolTip="{Binding StatusText}">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="{DynamicResource B.FgMuted}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                        <Setter Property="Fill" Value="{DynamicResource B.Success}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding State}" Value="{x:Static svc:ConnectionState.Error}">
+                                        <Setter Property="Fill" Value="{DynamicResource B.Danger}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <StackPanel Grid.Column="1" Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource BoolToVisInv}}">
+                        <TextBlock Text="{Binding StatusText}" FontSize="12.5" Foreground="{DynamicResource B.FgSecondary}" />
+                        <TextBlock Text="{Binding ActiveServer.CleanName, FallbackValue=''}" Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
+                        <TextBlock Style="{StaticResource T.Caption}" Margin="0,2,0,0"
+                                   Visibility="{Binding IsConnected, Converter={StaticResource BoolToVis}}">
+                            <Run Text="↓ " /><Run Text="{Binding DownloadSpeed, Mode=OneWay}" /><Run Text="   ↑ " /><Run Text="{Binding UploadSpeed, Mode=OneWay}" />
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+        <!-- ============================================================ content -->
+        <Grid Grid.Column="1">
+            <views:HomeView Visibility="{Binding CurrentPage, Converter={StaticResource EnumToVis}, ConverterParameter=Home}" />
+            <views:ServersView Visibility="{Binding CurrentPage, Converter={StaticResource EnumToVis}, ConverterParameter=Servers}" />
+            <views:SubscriptionsView Visibility="{Binding CurrentPage, Converter={StaticResource EnumToVis}, ConverterParameter=Subscriptions}" />
+            <views:RoutingView Visibility="{Binding CurrentPage, Converter={StaticResource EnumToVis}, ConverterParameter=Routing}" />
+            <views:SettingsView Visibility="{Binding CurrentPage, Converter={StaticResource EnumToVis}, ConverterParameter=Settings}" />
+            <views:LogsView Visibility="{Binding CurrentPage, Converter={StaticResource EnumToVis}, ConverterParameter=Logs}" />
+
+            <!-- caption buttons float over the page; the top 40px is the drag area -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <Button Style="{StaticResource Btn.Caption}" Click="Minimize_Click" ToolTip="Свернуть">
+                    <Path Style="{StaticResource Icon.Caption}" Data="{StaticResource I.WinMin}" />
+                </Button>
+                <Button Style="{StaticResource Btn.Caption}" Click="Maximize_Click">
+                    <Path x:Name="MaxIcon" Style="{StaticResource Icon.Caption}" Data="{StaticResource I.WinMax}" />
+                </Button>
+                <Button Style="{StaticResource Btn.CaptionClose}" Click="Close_Click">
+                    <Path Style="{StaticResource Icon.Caption}" Data="{StaticResource I.WinClose}" />
+                </Button>
+            </StackPanel>
+
+            <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,28"
+                    Background="{DynamicResource B.Fg}" CornerRadius="8" Padding="16,9"
+                    Visibility="{Binding Toast, Converter={StaticResource NullToVis}}" IsHitTestVisible="False">
+                <TextBlock Text="{Binding Toast}" Foreground="{DynamicResource B.Window}" FontSize="13" />
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

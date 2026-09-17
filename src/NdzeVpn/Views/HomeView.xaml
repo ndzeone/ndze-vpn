@@ -1,0 +1,208 @@
+<UserControl x:Class="NdzeVpn.Views.HomeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:NdzeVpn.ViewModels"
+             xmlns:ctl="clr-namespace:NdzeVpn.Controls"
+             xmlns:svc="clr-namespace:NdzeVpn.Services">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+
+            <!-- ============================================================ empty state -->
+            <StackPanel MaxWidth="460" VerticalAlignment="Center" Margin="48"
+                        Visibility="{Binding HasServers, Converter={StaticResource BoolToVisInv}}">
+                <TextBlock Text="Добавь ключ" Style="{StaticResource T.Title}" />
+                <TextBlock Style="{StaticResource T.Body}" TextWrapping="Wrap" Margin="0,8,0,24" FontSize="14"
+                           Text="vless:// ключ или ссылка на подписку из Telegram-бота. Можно несколько — по одной на строку." />
+                <TextBox Style="{StaticResource Input.Mono}" Height="112" TextWrapping="Wrap" AcceptsReturn="True"
+                         VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto"
+                         Tag="vless://…   или   https://…"
+                         Text="{Binding ImportText, UpdateSourceTrigger=PropertyChanged}" />
+                <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                    <Button Style="{StaticResource Btn.Primary}" Content="Добавить" Command="{Binding ImportFromBoxCommand}" />
+                    <Button Style="{StaticResource Btn.Outline}" Content="Вставить из буфера" Margin="10,0,0,0"
+                            Command="{Binding PasteFromClipboardCommand}" />
+                </StackPanel>
+            </StackPanel>
+
+            <!-- ============================================================ connect -->
+            <StackPanel Width="440" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,56"
+                        Visibility="{Binding HasServers, Converter={StaticResource BoolToVis}}">
+
+                <Button Width="168" Height="168" HorizontalAlignment="Center" Cursor="Hand" Focusable="False"
+                        Command="{Binding ToggleConnectionCommand}" ToolTip="Ctrl+Space">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Grid Background="Transparent">
+                                <Ellipse x:Name="glow" Fill="{DynamicResource B.SuccessSoft}" Visibility="Collapsed" />
+                                <Ellipse x:Name="ring" Stroke="{DynamicResource B.Border}" StrokeThickness="1" />
+
+                                <!-- spinning arc while connecting / disconnecting -->
+                                <Ellipse Stroke="{DynamicResource B.Fg}" StrokeThickness="1.5" StrokeDashArray="30 400"
+                                         StrokeDashCap="Round" RenderTransformOrigin="0.5,0.5">
+                                    <Ellipse.RenderTransform><RotateTransform /></Ellipse.RenderTransform>
+                                    <Ellipse.Style>
+                                        <Style TargetType="Ellipse">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard x:Name="spin">
+                                                            <Storyboard RepeatBehavior="Forever">
+                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                                 From="0" To="360" Duration="0:0:1.1" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
+                                                    <DataTrigger.ExitActions>
+                                                        <StopStoryboard BeginStoryboardName="spin" />
+                                                    </DataTrigger.ExitActions>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Ellipse.Style>
+                                </Ellipse>
+
+                                <Path x:Name="icon" Style="{StaticResource Icon}" Data="{StaticResource I.Power}"
+                                      StrokeThickness="1.4" Stroke="{DynamicResource B.FgSecondary}">
+                                    <Path.LayoutTransform><ScaleTransform ScaleX="1.6" ScaleY="1.6" /></Path.LayoutTransform>
+                                </Path>
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="ring" Property="Stroke" Value="{DynamicResource B.FgMuted}" />
+                                    <Setter TargetName="icon" Property="Stroke" Value="{DynamicResource B.Fg}" />
+                                </Trigger>
+                                <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                    <Setter TargetName="glow" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="ring" Property="Stroke" Value="{DynamicResource B.Success}" />
+                                    <Setter TargetName="icon" Property="Stroke" Value="{DynamicResource B.Success}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="{x:Static svc:ConnectionState.Error}">
+                                    <Setter TargetName="ring" Property="Stroke" Value="{DynamicResource B.Danger}" />
+                                    <Setter TargetName="icon" Property="Stroke" Value="{DynamicResource B.Danger}" />
+                                </DataTrigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <TextBlock Text="{Binding StatusText}" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource B.Fg}"
+                           HorizontalAlignment="Center" Margin="0,28,0,0" />
+
+                <Grid Margin="0,6,0,0" HorizontalAlignment="Center">
+                    <TextBlock Text="{Binding ElapsedText}" Style="{StaticResource T.Mono}" FontSize="13"
+                               Foreground="{DynamicResource B.FgMuted}" HorizontalAlignment="Center"
+                               Visibility="{Binding IsConnected, Converter={StaticResource BoolToVis}}" />
+                    <TextBlock Text="{Binding ErrorText}" Foreground="{DynamicResource B.Danger}" FontSize="13"
+                               TextWrapping="Wrap" TextAlignment="Center" MaxWidth="420"
+                               Visibility="{Binding ErrorText, Converter={StaticResource NullToVis}}" />
+                </Grid>
+
+                <!-- server picker -->
+                <Button Margin="0,36,0,0" Cursor="Hand" Focusable="False" HorizontalContentAlignment="Stretch"
+                        Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Page.Servers}">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bd" BorderBrush="{DynamicResource B.Border}" BorderThickness="1"
+                                    CornerRadius="{DynamicResource R.Card}" Padding="14,12" Background="Transparent">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="34" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding ActiveServer.CountryCode}" Style="{StaticResource T.Mono}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding ActiveServer.CleanName}" Style="{StaticResource T.H3}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Text="{Binding ActiveServer.LatencyMs, Converter={StaticResource LatencyText}}"
+                                               Foreground="{Binding ActiveServer.LatencyMs, Converter={StaticResource LatencyBrush}}"
+                                               FontSize="12.5" VerticalAlignment="Center" Margin="12,0" />
+                                    <Path Grid.Column="3" Style="{StaticResource Icon.Xs}" Data="{StaticResource I.ChevronRight}" Stroke="{DynamicResource B.FgMuted}" />
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.Hover}" />
+                                    <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource B.FgMuted}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
+                    <Button Style="{StaticResource Btn.Link}" Content="Предыдущий" Command="{Binding PreviousServerCommand}" />
+                    <TextBlock Text="·" Style="{StaticResource T.Caption}" Margin="10,0" />
+                    <Button Style="{StaticResource Btn.Link}" Content="Самый быстрый" Command="{Binding ConnectFastestCommand}" />
+                    <TextBlock Text="·" Style="{StaticResource T.Caption}" Margin="10,0" />
+                    <Button Style="{StaticResource Btn.Link}" Content="Следующий" Command="{Binding NextServerCommand}" />
+                </StackPanel>
+
+                <!-- numbers -->
+                <UniformGrid Columns="4" Margin="0,44,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Загрузка" Style="{StaticResource T.Caption}" />
+                        <TextBlock Text="{Binding DownloadSpeed}" FontSize="15" Foreground="{DynamicResource B.Fg}" Margin="0,4,0,0" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="Отдача" Style="{StaticResource T.Caption}" />
+                        <TextBlock Text="{Binding UploadSpeed}" FontSize="15" Foreground="{DynamicResource B.Fg}" Margin="0,4,0,0" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="Задержка" Style="{StaticResource T.Caption}" />
+                        <TextBlock Text="{Binding PingText}" FontSize="15" Foreground="{DynamicResource B.Fg}" Margin="0,4,0,0" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="За сессию" Style="{StaticResource T.Caption}" />
+                        <TextBlock Text="{Binding TotalTraffic}" FontSize="15" Foreground="{DynamicResource B.Fg}" Margin="0,4,0,0" />
+                    </StackPanel>
+                </UniformGrid>
+
+                <Rectangle Style="{StaticResource Line}" Margin="0,32,0,6" />
+
+                <!-- mode switches -->
+                <Border Style="{StaticResource Row}">
+                    <Grid>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Режим" Style="{StaticResource Row.Label}" />
+                            <TextBlock Text="TUN ловит игры и голос Discord" Style="{StaticResource T.Caption}" />
+                        </StackPanel>
+                        <Border Style="{StaticResource Seg.Track}" HorizontalAlignment="Right">
+                            <StackPanel Orientation="Horizontal">
+                                <ctl:SelectButton Style="{StaticResource Seg.Item}" Content="Прокси"
+                                                  IsChecked="{Binding IsTunMode, Converter={StaticResource InvBool}, Mode=OneWay}"
+                                                  Command="{Binding ApplyTunnelModeCommand}" CommandParameter="SystemProxy" />
+                                <ctl:SelectButton Style="{StaticResource Seg.Item}" Content="TUN"
+                                                  IsChecked="{Binding IsTunMode, Mode=OneWay}"
+                                                  Command="{Binding ApplyTunnelModeCommand}" CommandParameter="Tun" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Row}" BorderThickness="0">
+                    <Grid>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Маршрутизация" Style="{StaticResource Row.Label}" />
+                            <TextBlock Text="Умный: российское напрямую" Style="{StaticResource T.Caption}" />
+                        </StackPanel>
+                        <Border Style="{StaticResource Seg.Track}" HorizontalAlignment="Right">
+                            <StackPanel Orientation="Horizontal">
+                                <ctl:SelectButton Style="{StaticResource Seg.Item}" Content="Умный" Padding="10,6"
+                                                  IsChecked="{Binding RoutingMode, Converter={StaticResource EnumEq}, ConverterParameter=Smart, Mode=OneWay}"
+                                                  Command="{Binding ApplyRoutingModeCommand}" CommandParameter="Smart" />
+                                <ctl:SelectButton Style="{StaticResource Seg.Item}" Content="Весь" Padding="10,6"
+                                                  IsChecked="{Binding RoutingMode, Converter={StaticResource EnumEq}, ConverterParameter=Global, Mode=OneWay}"
+                                                  Command="{Binding ApplyRoutingModeCommand}" CommandParameter="Global" />
+                                <ctl:SelectButton Style="{StaticResource Seg.Item}" Content="Свои" Padding="10,6"
+                                                  IsChecked="{Binding RoutingMode, Converter={StaticResource EnumEq}, ConverterParameter=Custom, Mode=OneWay}"
+                                                  Command="{Binding ApplyRoutingModeCommand}" CommandParameter="Custom" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

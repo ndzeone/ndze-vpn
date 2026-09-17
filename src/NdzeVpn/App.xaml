@@ -1,0 +1,26 @@
+<Application x:Class="NdzeVpn.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:NdzeVpn.Converters"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Index 0 is the active theme; App.ApplyTheme swaps it at runtime. -->
+                <ResourceDictionary Source="Themes/Graphite.xaml" />
+                <ResourceDictionary Source="Themes/Controls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
+            <conv:BoolToVisibilityConverter x:Key="BoolToVisInv" Invert="True" />
+            <conv:InverseBoolConverter x:Key="InvBool" />
+            <conv:EnumEqualsConverter x:Key="EnumEq" />
+            <conv:EnumToVisibilityConverter x:Key="EnumToVis" />
+            <conv:LatencyBrushConverter x:Key="LatencyBrush" />
+            <conv:LatencyTextConverter x:Key="LatencyText" />
+            <conv:NullToVisibilityConverter x:Key="NullToVis" />
+            <conv:IntStringConverter x:Key="IntStr" />
+            <conv:BytesConverter x:Key="Bytes" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
