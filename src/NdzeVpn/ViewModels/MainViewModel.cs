@@ -488,7 +488,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task SubmitSearch()
     {
-        var text = SearchText.Trim();
+        var text = ClientLinks.Unwrap(SearchText.Trim());
         if (text.Length == 0) return;
 
         if (ShareLinkParser.ExtractLinks(text).Any())
@@ -512,7 +512,7 @@ public sealed partial class MainViewModel : ObservableObject
     private async Task PasteFromClipboard()
     {
         string text;
-        try { text = Clipboard.GetText(); }
+        try { text = ClientLinks.Unwrap(Clipboard.GetText() ?? ""); }
         catch { ShowToast("Не удалось прочитать буфер обмена"); return; }
 
         if (string.IsNullOrWhiteSpace(text))
@@ -586,6 +586,167 @@ public sealed partial class MainViewModel : ObservableObject
             _vpn.Store.SaveSettings();
             SyncState();
         }
+    }
+
+    // ================================================================== key checker
+
+    private readonly KeyCheckService _checker = new();
+    private CancellationTokenSource? _checkCts;
+
+    [ObservableProperty] private string _checkInput = "";
+    [ObservableProperty] private bool _isChecking;
+    [ObservableProperty] private KeyCheckResult? _checkResult;
+    [ObservableProperty] private string _checkStatus = "";
+
+    public ObservableCollection<ServerItemViewModel> CheckedNodes { get; } = [];
+
+    public bool HasCheckResult => CheckResult is not null;
+    public bool CheckOk => CheckResult?.Ok == true;
+
+    public string DeviceIdText => ClientIdentity.DeviceId(Settings.DeviceId);
+
+    partial void OnCheckResultChanged(KeyCheckResult? value)
+    {
+        OnPropertyChanged(nameof(HasCheckResult));
+        OnPropertyChanged(nameof(CheckOk));
+        OnPropertyChanged(nameof(CheckHeadline));
+        OnPropertyChanged(nameof(CheckDetails));
+        OnPropertyChanged(nameof(CheckUnsupported));
+    }
+
+    public string CheckHeadline => CheckResult switch
+    {
+        null => "",
+        { Ok: false, Error: { } error } => error,
+        { Ok: false } => "Ключей не найдено",
+        { Nodes.Count: var n } r => $"{r.Kind}: {n} серв. · {r.Format}"
+    };
+
+    public string CheckDetails
+    {
+        get
+        {
+            if (CheckResult is not { } r) return "";
+
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(r.Title)) parts.Add(r.Title!);
+            if (!string.IsNullOrWhiteSpace(r.Traffic)) parts.Add(r.Traffic!);
+            if (!string.IsNullOrWhiteSpace(r.SourceApp)) parts.Add($"ссылка {r.SourceApp}");
+            if (r.Ok)
+            {
+                var alive = CheckedNodes.Count(n => n.LatencyMs > 0);
+                parts.Add($"отвечают {alive} из {CheckedNodes.Count}");
+            }
+            return string.Join("  ·  ", parts);
+        }
+    }
+
+    public string CheckUnsupported => CheckResult is { Unsupported.Count: > 0 } r
+        ? "Пропущено (ядро не умеет): " + string.Join(", ", r.Unsupported.Take(6)) +
+          (r.Unsupported.Count > 6 ? $" и ещё {r.Unsupported.Count - 6}" : "")
+        : "";
+
+    [RelayCommand]
+    private void OpenKeyCheck()
+    {
+        var existing = Application.Current.Windows.OfType<Views.KeyCheckWindow>().FirstOrDefault();
+        if (existing is not null)
+        {
+            existing.Activate();
+            return;
+        }
+
+        var window = new Views.KeyCheckWindow { DataContext = this };
+        if (Application.Current.MainWindow is { IsVisible: true } owner) window.Owner = owner;
+        window.Show();
+    }
+
+    [RelayCommand]
+    private async Task CheckKey()
+    {
+        if (IsChecking)
+        {
+            _checkCts?.Cancel();
+            return;
+        }
+
+        var input = CheckInput.Trim();
+        if (input.Length == 0)
+        {
+            try { input = Clipboard.GetText().Trim(); CheckInput = input; }
+            catch { }
+            if (input.Length == 0) return;
+        }
+
+        IsChecking = true;
+        CheckStatus = "Проверяю…";
+        CheckResult = null;
+        CheckedNodes.Clear();
+        _checkCts = new CancellationTokenSource();
+
+        try
+        {
+            var result = await _checker.CheckAsync(input, Settings, _checkCts.Token);
+
+            var i = 1;
+            foreach (var node in result.Nodes) CheckedNodes.Add(new ServerItemViewModel(node, i++));
+
+            CheckResult = result;
+            CheckStatus = result.Ok ? "" : result.Error ?? "";
+        }
+        catch (OperationCanceledException)
+        {
+            CheckStatus = "Проверка отменена";
+        }
+        catch (Exception ex)
+        {
+            CheckStatus = ex.Message;
+            LogBus.Instance.Error("check", "Key check failed", ex);
+        }
+        finally
+        {
+            IsChecking = false;
+            OnPropertyChanged(nameof(CheckDetails));
+        }
+    }
+
+    [RelayCommand]
+    private async Task AddChecked()
+    {
+        if (CheckResult is not { Ok: true } result) return;
+
+        if (result.IsSubscription)
+        {
+            await AddSubscriptionFromUrl(result.Target, result.Title);
+            ShowToast($"Подписка добавлена: {result.Nodes.Count} серв.");
+        }
+        else
+        {
+            _vpn.AddProfiles(result.Nodes, out var added, out var skipped);
+            ShowToast(skipped > 0 ? $"Добавлено {added}, уже были: {skipped}" : $"Добавлено серверов: {added}");
+        }
+
+        CheckResult = null;
+        CheckedNodes.Clear();
+        CheckInput = "";
+    }
+
+    [RelayCommand]
+    private void PasteToCheck()
+    {
+        try { CheckInput = Clipboard.GetText().Trim(); }
+        catch { ShowToast("Не удалось прочитать буфер обмена"); }
+    }
+
+    [RelayCommand]
+    private void CopyDeviceId()
+    {
+        try
+        {
+            Clipboard.SetText(DeviceIdText);
+            ShowToast("ID устройства скопирован");
+        }
+        catch { }
     }
 
     // ================================================================== subscriptions

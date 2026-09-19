@@ -6,7 +6,7 @@
 #   4. publish a self-contained win-x64 build (no .NET install needed on the target PC)
 #   5. compile the Inno Setup installer -> artifacts\NdzeVPN-Setup-<version>.exe
 param(
-    [string]$Version = "1.3.0",
+    [string]$Version = "1.4.0",
     [switch]$SkipTests
 )
 

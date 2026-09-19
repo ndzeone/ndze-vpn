@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 using NdzeVpn.Models;
 
@@ -7,21 +8,33 @@ namespace NdzeVpn.Services;
 public sealed record SubscriptionResult(
     List<ServerProfile> Nodes,
     string? Error,
-    string? TrafficInfo);
+    string? TrafficInfo)
+{
+    /// <summary>Which body format the panel answered with ("ссылки", "Xray JSON", …).</summary>
+    public string Format { get; init; } = "";
+
+    /// <summary>Name the panel suggests for this subscription (Profile-Title header).</summary>
+    public string? Title { get; init; }
+
+    /// <summary>Message the panel wants shown to the user (Announce header).</summary>
+    public string? Announce { get; init; }
+
+    /// <summary>Nodes found but not runnable by this app's core (Hysteria, TUIC, WireGuard…).</summary>
+    public List<string> Unsupported { get; init; } = [];
+}
 
 /// <summary>
 /// Fetches node lists from subscription URLs.
 ///
-/// Telegram VPN bots rarely hand out a clean base64 subscription — the link is usually a landing
-/// page that shows the key, or a redirect chain ending at one. So this tries, in order:
-/// share links anywhere in the body, base64 of the whole body, then one level of following
-/// subscription-looking links found in the HTML.
+/// Panels answer differently depending on who asks: the same link returns share links to one
+/// client, Xray JSON to Happ, sing-box JSON to SFI and a Clash config to Clash. Panels with a
+/// device limit hand out a placeholder node unless the request identifies the device. So this
+/// sends the device headers, tries a series of client identities, and parses every format
+/// (see <see cref="ConfigImporter"/>). Telegram bots often serve a landing page instead, so one
+/// level of subscription-looking links is followed as a last resort.
 /// </summary>
 public sealed partial class SubscriptionService
 {
-    private const string DefaultUserAgent =
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
-
     [GeneratedRegex("""href\s*=\s*["']([^"']+)["']""", RegexOptions.IgnoreCase)]
     private static partial Regex HrefRegex();
 
@@ -31,50 +44,90 @@ public sealed partial class SubscriptionService
     public async Task<SubscriptionResult> FetchAsync(Subscription sub, AppSettings settings, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(sub.Url))
-            return new SubscriptionResult([], "Subscription URL is empty.", null);
+            return new SubscriptionResult([], "Ссылка подписки пуста.", null);
 
-        // A "subscription" that is itself just a share link needs no network round trip.
-        var inline = ShareLinkParser.ParseMany(sub.Url);
-        if (inline.Count > 0)
-            return new SubscriptionResult(inline, null, null);
+        var url = ClientLinks.Unwrap(sub.Url.Trim());
 
-        using var http = CreateClient(sub, settings);
+        // A "subscription" that is itself just a key needs no network round trip.
+        var inline = ConfigImporter.Parse(url);
+        if (inline.Nodes.Count > 0)
+            return new SubscriptionResult(inline.Nodes, null, null) { Format = inline.Format, Unsupported = inline.Unsupported };
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
+            return new SubscriptionResult([], "Это не ссылка на подписку и не ключ.", null);
+
+        string? lastError = null;
+        Fetched? lastFetch = null;
 
         try
         {
-            var (body, traffic) = await GetAsync(http, sub.Url, ct);
-
-            var nodes = ExtractNodes(body);
-            if (nodes.Count > 0)
-                return new SubscriptionResult(nodes, null, traffic);
-
-            // Landing page: follow the most subscription-looking link on it, once.
-            foreach (var candidate in FindCandidateLinks(body, sub.Url).Take(4))
+            // The first identity that yields real nodes wins. A panel that does not know us answers
+            // with a placeholder node, which counts as "nothing" here.
+            foreach (var agent in Agents(sub))
             {
                 ct.ThrowIfCancellationRequested();
+
+                using var http = CreateClient(sub, settings, agent);
                 try
                 {
-                    LogBus.Instance.Debug("sub", $"Following candidate link {candidate}");
-                    var (inner, innerTraffic) = await GetAsync(http, candidate, ct);
-                    var innerNodes = ExtractNodes(inner);
-                    if (innerNodes.Count > 0)
-                        return new SubscriptionResult(innerNodes, null, innerTraffic ?? traffic);
+                    var fetched = await GetAsync(http, url, ct);
+                    lastFetch = fetched;
+
+                    var report = ConfigImporter.Parse(fetched.Body);
+                    var nodes = report.Nodes.Where(n => !ConfigImporter.IsPlaceholder(n)).ToList();
+
+                    if (nodes.Count > 0)
+                    {
+                        LogBus.Instance.Info("sub",
+                            $"'{sub.Name}': {nodes.Count} node(s), format {report.Format}, as {Short(agent)}");
+                        return Success(nodes, report, fetched);
+                    }
+
+                    if (report.Nodes.Count > 0)
+                        LogBus.Instance.Debug("sub", $"Panel answered '{Short(agent)}' with a placeholder node only");
                 }
-                catch (Exception ex)
+                catch (HttpRequestException ex)
                 {
-                    LogBus.Instance.Debug("sub", $"Candidate {candidate} failed: {ex.Message}");
+                    lastError = ex.Message;
+                    LogBus.Instance.Debug("sub", $"As {Short(agent)}: {ex.Message}");
                 }
             }
 
-            return new SubscriptionResult([], "No nodes found at this URL. Open it in a browser and paste the key manually.", traffic);
+            // Landing page: follow the most subscription-looking link on it, once.
+            if (lastFetch is { } page)
+            {
+                using var http = CreateClient(sub, settings, Agents(sub).First());
+                foreach (var candidate in FindCandidateLinks(page.Body, url).Take(4))
+                {
+                    ct.ThrowIfCancellationRequested();
+                    try
+                    {
+                        LogBus.Instance.Debug("sub", $"Following candidate link {candidate}");
+                        var inner = await GetAsync(http, candidate, ct);
+                        var report = ConfigImporter.Parse(inner.Body);
+                        var nodes = report.Nodes.Where(n => !ConfigImporter.IsPlaceholder(n)).ToList();
+                        if (nodes.Count > 0) return Success(nodes, report, inner with { Traffic = inner.Traffic ?? page.Traffic });
+                    }
+                    catch (Exception ex)
+                    {
+                        LogBus.Instance.Debug("sub", $"Candidate {candidate} failed: {ex.Message}");
+                    }
+                }
+            }
+
+            var message = lastFetch?.Body.Length > 0
+                ? "Панель ответила, но ключей в ответе нет. Возможно, исчерпан лимит устройств на подписке."
+                : lastError ?? "Ничего не удалось загрузить по этой ссылке.";
+
+            return new SubscriptionResult([], message, lastFetch?.Traffic)
+            {
+                Title = lastFetch?.Title,
+                Announce = lastFetch?.Announce
+            };
         }
         catch (OperationCanceledException)
         {
-            return new SubscriptionResult([], "Cancelled.", null);
-        }
-        catch (HttpRequestException ex)
-        {
-            return new SubscriptionResult([], $"Network error: {ex.Message}", null);
+            return new SubscriptionResult([], "Отменено.", null);
         }
         catch (Exception ex)
         {
@@ -82,38 +135,89 @@ public sealed partial class SubscriptionService
         }
     }
 
-    private static List<ServerProfile> ExtractNodes(string body)
+    private static SubscriptionResult Success(List<ServerProfile> nodes, ImportReport report, Fetched fetched) =>
+        new(nodes, null, fetched.Traffic)
+        {
+            Format = report.Format,
+            Title = fetched.Title,
+            Announce = fetched.Announce,
+            Unsupported = report.Unsupported
+        };
+
+    private static IEnumerable<string> Agents(Subscription sub)
     {
-        if (string.IsNullOrWhiteSpace(body)) return [];
+        if (!string.IsNullOrWhiteSpace(sub.UserAgent)) yield return sub.UserAgent.Trim();
+        foreach (var agent in ClientIdentity.UserAgents) yield return agent;
+    }
 
-        // Plain list, or links embedded in HTML/JSON.
-        var direct = ShareLinkParser.ParseMany(body);
-        if (direct.Count > 0) return direct;
+    private static string Short(string userAgent) => userAgent.Split('/', ' ')[0];
 
-        // Classic base64 subscription.
-        if (ShareLinkParser.LooksLikeBase64(body))
+    // ------------------------------------------------------------------ http
+
+    private sealed record Fetched(string Body, string? Traffic, string? Title, string? Announce);
+
+    private static async Task<Fetched> GetAsync(HttpClient http, string url, CancellationToken ct)
+    {
+        using var response = await http.GetAsync(url, HttpCompletionOption.ResponseContentRead, ct);
+        response.EnsureSuccessStatusCode();
+
+        var body = await response.Content.ReadAsStringAsync(ct);
+
+        string? Header(string name) =>
+            response.Headers.TryGetValues(name, out var values) ? string.Join("; ", values) : null;
+
+        // Most panels report quota in this header: upload=…; download=…; total=…; expire=…
+        var traffic = Header("subscription-userinfo") is { } info ? FormatTraffic(info) : null;
+
+        return new Fetched(body, traffic, DecodeHeader(Header("profile-title")), DecodeHeader(Header("announce")));
+    }
+
+    /// <summary>Panels send these either as plain text or as <c>base64:…</c>.</summary>
+    private static string? DecodeHeader(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        value = value.Trim();
+
+        if (!value.StartsWith("base64:", StringComparison.OrdinalIgnoreCase)) return value;
+
+        try
         {
-            try
-            {
-                var decoded = ShareLinkParser.Base64Decode(body);
-                var fromBase64 = ShareLinkParser.ParseMany(decoded);
-                if (fromBase64.Count > 0) return fromBase64;
-            }
-            catch { }
+            return Encoding.UTF8.GetString(Convert.FromBase64String(value["base64:".Length..].Trim())).Trim();
         }
-
-        // Some panels base64 each line separately.
-        var perLine = new List<ServerProfile>();
-        foreach (var line in body.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        catch
         {
-            if (!ShareLinkParser.LooksLikeBase64(line)) continue;
-            try
-            {
-                perLine.AddRange(ShareLinkParser.ParseMany(ShareLinkParser.Base64Decode(line)));
-            }
-            catch { }
+            return null;
         }
-        return perLine;
+    }
+
+    private static string? FormatTraffic(string header)
+    {
+        try
+        {
+            var parts = header.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(p => p.Split('=', 2))
+                .Where(p => p.Length == 2)
+                .ToDictionary(p => p[0].Trim().ToLowerInvariant(), p => p[1].Trim());
+
+            long Get(string key) => parts.TryGetValue(key, out var v) && long.TryParse(v, out var n) ? n : 0;
+
+            var used = Get("upload") + Get("download");
+            var total = Get("total");
+            var expire = Get("expire");
+
+            var text = total > 0
+                ? $"{StatsService.FormatBytes(used)} / {StatsService.FormatBytes(total)}"
+                : $"{StatsService.FormatBytes(used)} · безлимит";
+
+            if (expire > 0)
+                text += $" · до {DateTimeOffset.FromUnixTimeSeconds(expire).LocalDateTime:dd.MM.yyyy}";
+
+            return text;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static IEnumerable<string> FindCandidateLinks(string body, string baseUrl)
@@ -146,52 +250,7 @@ public sealed partial class SubscriptionService
         }
     }
 
-    private static async Task<(string Body, string? Traffic)> GetAsync(HttpClient http, string url, CancellationToken ct)
-    {
-        using var response = await http.GetAsync(url, HttpCompletionOption.ResponseContentRead, ct);
-        response.EnsureSuccessStatusCode();
-
-        var body = await response.Content.ReadAsStringAsync(ct);
-
-        // Most panels report quota in this header: upload=…; download=…; total=…; expire=…
-        string? traffic = null;
-        if (response.Headers.TryGetValues("subscription-userinfo", out var values))
-            traffic = FormatTraffic(string.Join("; ", values));
-
-        return (body, traffic);
-    }
-
-    private static string? FormatTraffic(string header)
-    {
-        try
-        {
-            var parts = header.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Select(p => p.Split('=', 2))
-                .Where(p => p.Length == 2)
-                .ToDictionary(p => p[0].Trim().ToLowerInvariant(), p => p[1].Trim());
-
-            long Get(string key) => parts.TryGetValue(key, out var v) && long.TryParse(v, out var n) ? n : 0;
-
-            var used = Get("upload") + Get("download");
-            var total = Get("total");
-            var expire = Get("expire");
-
-            var text = total > 0
-                ? $"{StatsService.FormatBytes(used)} / {StatsService.FormatBytes(total)}"
-                : StatsService.FormatBytes(used);
-
-            if (expire > 0)
-                text += $" · until {DateTimeOffset.FromUnixTimeSeconds(expire).LocalDateTime:dd.MM.yyyy}";
-
-            return text;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static HttpClient CreateClient(Subscription sub, AppSettings settings)
+    private static HttpClient CreateClient(Subscription sub, AppSettings settings, string userAgent)
     {
         var handler = new HttpClientHandler
         {
@@ -213,9 +272,11 @@ public sealed partial class SubscriptionService
         }
 
         var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd(
-            string.IsNullOrWhiteSpace(sub.UserAgent) ? DefaultUserAgent : sub.UserAgent);
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
         client.DefaultRequestHeaders.Accept.ParseAdd("*/*");
+
+        foreach (var (name, value) in ClientIdentity.Headers(settings.DeviceId))
+            client.DefaultRequestHeaders.TryAddWithoutValidation(name, value);
 
         return client;
     }

@@ -49,6 +49,7 @@ internal static class Snapshots
         vm.IsSidebarCollapsed = collapsed;
 
         await RenderWindow(new Views.DiscordWindow { DataContext = vm }, Path.Combine(outDir, "Window-Discord.png"));
+        await RenderWindow(new Views.KeyCheckWindow { DataContext = vm }, Path.Combine(outDir, "Window-KeyCheck.png"));
 
         vm.AvailableUpdate ??= new Services.UpdateInfo(new Version(9, 9, 9), "v9.9.9", "Ndze VPN 9.9.9",
             "• Пример заметок к релизу\n• Сворачиваемая боковая панель\n• Отдельное окно для Discord",

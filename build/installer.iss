@@ -3,7 +3,7 @@
 ; choose an all-users install instead.
 
 #ifndef AppVersion
-  #define AppVersion "1.3.0"
+  #define AppVersion "1.4.0"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish"

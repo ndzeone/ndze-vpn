@@ -63,6 +63,7 @@
     <Geometry x:Key="I.Sliders">M4,7 H13 M17,7 H20 M4,17 H7 M11,17 H20 M15,4.5 V9.5 M9,14.5 V19.5</Geometry>
     <Geometry x:Key="I.Doc">M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19 M9,13 H16 M9,17 H14</Geometry>
     <Geometry x:Key="I.Sidebar">M4,4.5 H20 V19.5 H4 Z M9.5,4.5 V19.5</Geometry>
+    <Geometry x:Key="I.Key">M8.5,15.5 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M11.7,12.3 L20,4 M16.5,7.2 L18.9,9.6 M14.1,9.6 L16.5,12</Geometry>
     <Geometry x:Key="I.ChevronLeft">M15,5 L8,12 L15,19</Geometry>
     <Geometry x:Key="I.ChevronRight">M9,5 L16,12 L9,19</Geometry>
     <Geometry x:Key="I.ChevronUp">M5,15 L12,8 L19,15</Geometry>
@@ -287,7 +288,7 @@
     <!-- Sidebar entry: icon (Tag = Geometry) + label; the label hides when the sidebar is collapsed
          (DataContext.IsSidebarCollapsed) and becomes a tooltip instead. Works for Button and ToggleButton. -->
     <ControlTemplate x:Key="Nav.Template" TargetType="ToggleButton">
-        <Border x:Name="bd" Background="Transparent" CornerRadius="7">
+        <Border x:Name="bd" Background="Transparent" CornerRadius="9">
             <Grid>
                 <Rectangle x:Name="bar" Width="2" Height="14" HorizontalAlignment="Left" Fill="{DynamicResource B.Fg}"
                            RadiusX="1" RadiusY="1" Visibility="Hidden" Margin="-10,0,0,0" />
@@ -303,8 +304,11 @@
                 <Setter Property="Foreground" Value="{DynamicResource B.Fg}" />
                 <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.Hover}" />
             </Trigger>
+            <!-- Selected page reads as a filled pill; the bar stays as a second, quieter cue. -->
             <Trigger Property="IsChecked" Value="True">
                 <Setter Property="Foreground" Value="{DynamicResource B.Fg}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.Elevated}" />
                 <Setter TargetName="bar" Property="Visibility" Value="Visible" />
             </Trigger>
             <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
@@ -379,6 +383,7 @@
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.Window}" />
                             <Setter Property="Foreground" Value="{DynamicResource B.Fg}" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -430,6 +435,8 @@
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource B.Fg}" />
+                            <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.Panel}" />
+                            <Setter TargetName="bd" Property="BorderThickness" Value="1.4" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

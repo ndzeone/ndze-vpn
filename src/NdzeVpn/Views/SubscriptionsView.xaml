@@ -5,9 +5,18 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="48,56,48,40" MaxWidth="760" HorizontalAlignment="Left">
-            <TextBlock Text="Подписки" Style="{StaticResource T.Title}" />
+            <Grid>
+                <TextBlock Text="Подписки" Style="{StaticResource T.Title}" />
+                <Button Style="{StaticResource Btn.Outline}" HorizontalAlignment="Right" VerticalAlignment="Center" Padding="14,7"
+                        Command="{Binding OpenKeyCheckCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Style="{StaticResource Icon.Sm}" Data="{StaticResource I.Key}" Margin="0,0,8,0" />
+                        <TextBlock Text="Проверить ключ" />
+                    </StackPanel>
+                </Button>
+            </Grid>
             <TextBlock Style="{StaticResource T.Body}" FontSize="14" Margin="0,8,0,36" TextWrapping="Wrap"
-                       Text="Ссылки от Telegram-ботов, base64-подписки и отдельные ключи vless, vmess, trojan, ss." />
+                       Text="Ссылки от Telegram-ботов и панелей, base64-подписки, Xray JSON, sing-box и Clash, отдельные ключи vless, vmess, trojan, ss, а также ссылки-импорты из Happ, INCY, Hiddify и v2RayTun." />
 
             <!-- add subscription -->
             <TextBlock Text="Новая подписка" Style="{StaticResource T.Label}" />

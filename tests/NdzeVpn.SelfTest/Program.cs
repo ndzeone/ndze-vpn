@@ -57,6 +57,97 @@ Check("base64 subscription body", fromB64.Count == 2);
 var (code, clean) = CountryFlag.Split("🇳🇱 | Amsterdam");
 Check("flag → country code", code == "NL" && clean == "Amsterdam", $"{code} / {clean}");
 
+// ------------------------------------------------------------------ other clients' formats
+Console.WriteLine("Formats other clients are served");
+
+// Xray JSON: what Happ (and this panel type) hands out — an array of complete configs.
+var xrayJson = """
+[
+  {"remarks":"🇫🇮 Helsinki","outbounds":[
+    {"tag":"proxy","protocol":"vless","settings":{"vnext":[{"address":"fi.example.com","port":443,
+      "users":[{"id":"0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0","flow":"xtls-rprx-vision","encryption":"none"}]}]},
+     "streamSettings":{"network":"tcp","security":"reality","realitySettings":{"serverName":"www.microsoft.com",
+      "publicKey":"Z84J2IelR9ch3k8VtlVhhs5ycBUlXA7wHBWcBrjqnAw","shortId":"6ba85179e30d4fc2","fingerprint":"firefox","spiderX":"/"}}},
+    {"tag":"direct","protocol":"freedom"}]},
+  {"remarks":"HY2 node","outbounds":[{"tag":"proxy","protocol":"hysteria2","settings":{}}]}
+]
+""";
+var fromXray = ConfigImporter.Parse(xrayJson);
+Check("Xray JSON recognised", fromXray.Format == "Xray JSON", fromXray.Format);
+Check("Xray JSON node parsed", fromXray.Nodes is [{ Protocol: ProxyProtocol.Vless, Address: "fi.example.com", Port: 443, StreamSecurity: "reality", Flow: "xtls-rprx-vision" }]);
+Check("Xray JSON reality fields", fromXray.Nodes[0].PublicKey.Length > 20 && fromXray.Nodes[0].Sni == "www.microsoft.com");
+Check("Xray JSON remark kept", fromXray.Nodes[0].Remark == "🇫🇮 Helsinki", fromXray.Nodes[0].Remark);
+Check("hysteria2 reported as unsupported", fromXray.Unsupported.Any(u => u.StartsWith("hysteria2")), string.Join(", ", fromXray.Unsupported));
+
+// sing-box JSON: what SFI, Karing and INCY are served.
+var singBoxJson = """
+{"outbounds":[
+  {"type":"selector","tag":"sel","outbounds":["a"]},
+  {"type":"vless","tag":"🇳🇱 Amsterdam","server":"nl.example.com","server_port":443,
+   "uuid":"0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0","flow":"xtls-rprx-vision",
+   "tls":{"enabled":true,"server_name":"www.cloudflare.com","utls":{"enabled":true,"fingerprint":"chrome"},
+          "reality":{"enabled":true,"public_key":"Z84J2IelR9ch3k8VtlVhhs5ycBUlXA7wHBWcBrjqnAw","short_id":"ab12"}}},
+  {"type":"trojan","tag":"TR","server":"tr.example.com","server_port":8443,"password":"secret",
+   "tls":{"enabled":true,"server_name":"tr.example.com"},"transport":{"type":"ws","path":"/ws","headers":{"Host":"tr.example.com"}}},
+  {"type":"hysteria2","tag":"HY","server":"hy.example.com","server_port":443,"password":"x"},
+  {"type":"direct","tag":"direct"}]}
+""";
+var fromSingBox = ConfigImporter.Parse(singBoxJson);
+Check("sing-box JSON recognised", fromSingBox.Format == "sing-box JSON", fromSingBox.Format);
+Check("sing-box vless + reality", fromSingBox.Nodes.Any(n => n is { Protocol: ProxyProtocol.Vless, StreamSecurity: "reality", Sni: "www.cloudflare.com", Fingerprint: "chrome" }));
+Check("sing-box trojan over ws", fromSingBox.Nodes.Any(n => n is { Protocol: ProxyProtocol.Trojan, Network: "ws", Path: "/ws", Host: "tr.example.com", Port: 8443 }));
+Check("sing-box selector/direct skipped", fromSingBox.Nodes.Count == 2, $"{fromSingBox.Nodes.Count} nodes");
+
+// Clash / Mihomo YAML.
+var clashYaml = """
+port: 7890
+proxies:
+  - {name: "🇩🇪 Frankfurt", type: vless, server: de.example.com, port: 443, uuid: 0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0, network: ws, tls: true, servername: de.example.com, path: /ws}
+  - name: "SS node"
+    type: ss
+    server: ss.example.com
+    port: 8388
+    cipher: chacha20-ietf-poly1305
+    password: pw
+  - {name: "HY", type: hysteria2, server: hy.example.com, port: 443, password: x}
+proxy-groups:
+  - {name: auto, type: url-test}
+""";
+var fromClash = ConfigImporter.Parse(clashYaml);
+Check("Clash YAML recognised", fromClash.Format == "Clash YAML", fromClash.Format);
+Check("Clash vless over ws", fromClash.Nodes.Any(n => n is { Protocol: ProxyProtocol.Vless, Network: "ws", Address: "de.example.com", Path: "/ws" }));
+Check("Clash block-style ss", fromClash.Nodes.Any(n => n is { Protocol: ProxyProtocol.Shadowsocks, Address: "ss.example.com", Port: 8388, Method: "chacha20-ietf-poly1305" }));
+Check("Clash groups not taken for nodes", fromClash.Nodes.Count == 2, $"{fromClash.Nodes.Count} nodes");
+
+// Import links of other clients.
+var subUrl = "https://panel.example.com/sub/abc123";
+var b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(subUrl));
+Check("happ://add/<base64> unwrapped", ClientLinks.Unwrap($"happ://add/{b64}") == subUrl);
+Check("happ://add/<url> unwrapped", ClientLinks.Unwrap($"happ://add/{subUrl}") == subUrl);
+Check("v2raytun://import/<url> unwrapped", ClientLinks.Unwrap($"v2raytun://import/{subUrl}") == subUrl);
+Check("hiddify://install-config?url= unwrapped", ClientLinks.Unwrap($"hiddify://install-config?url={Uri.EscapeDataString(subUrl)}") == subUrl);
+Check("sing-box://import-remote-profile unwrapped", ClientLinks.Unwrap($"sing-box://import-remote-profile?url={Uri.EscapeDataString(subUrl)}") == subUrl);
+Check("plain URL left alone", ClientLinks.Unwrap(subUrl) == subUrl);
+Check("encrypted happ link detected", ClientLinks.IsEncryptedHapp("happ://crypt4/AAAA"));
+Check("source app named", ClientLinks.SourceApp("incy://add/" + b64) == "INCY");
+Check("placeholder node detected", ConfigImporter.IsPlaceholder(
+    ShareLinkParser.Parse("vless://00000000-0000-0000-0000-000000000000@0.0.0.0:1?encryption=none&type=tcp#App%20not%20supported")!));
+Check("device id is stable", ClientIdentity.DeviceId() == ClientIdentity.DeviceId() && ClientIdentity.DeviceId().StartsWith("ndze-"));
+
+// Live check against a real subscription, when one is provided (never stored in the repo).
+if (Environment.GetEnvironmentVariable("NDZEVPN_TEST_SUB") is { Length: > 0 } liveSub)
+{
+    var live = await new KeyCheckService().CheckAsync(liveSub, new AppSettings());
+    Check("live subscription returns nodes", live.Ok && live.Nodes.Count > 0,
+        live.Ok ? $"{live.Nodes.Count} nodes, {live.Format}, {live.Traffic}" : live.Error);
+    if (live.Ok)
+    {
+        Console.WriteLine($"         title: {live.Title}");
+        Console.WriteLine($"         alive: {live.Nodes.Count(n => n.IsAlive)} / {live.Nodes.Count}");
+        if (live.Unsupported.Count > 0) Console.WriteLine($"         skipped: {live.Unsupported.Count} unsupported");
+    }
+}
+
 // ------------------------------------------------------------------ updates / discord
 Console.WriteLine("Updates");
 Check("tag v1.2.0 parsed", UpdateService.TryParseVersion("v1.2.0", out var v120) && v120 == new Version(1, 2, 0));

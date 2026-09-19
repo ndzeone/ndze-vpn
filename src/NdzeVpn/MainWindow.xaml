@@ -22,6 +22,7 @@
         <KeyBinding Key="Right" Modifiers="Alt" Command="{Binding GoForwardCommand}" />
         <KeyBinding Key="Left" Modifiers="Alt" Command="{Binding GoBackCommand}" />
         <KeyBinding Key="F5" Command="{Binding TestPingCommand}" />
+        <KeyBinding Key="K" Modifiers="Control" Command="{Binding OpenKeyCheckCommand}" />
     </Window.InputBindings>
 
     <Grid x:Name="Root">
@@ -117,6 +118,8 @@
                                       IsChecked="{Binding CurrentPage, Converter={StaticResource EnumEq}, ConverterParameter=Logs, Mode=OneWay}"
                                       Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Page.Logs}" />
                     <Rectangle Style="{StaticResource Line}" Margin="12,12" />
+                    <Button Style="{StaticResource Nav.Action}" Content="Проверка ключа" Tag="{StaticResource I.Key}"
+                            Command="{Binding OpenKeyCheckCommand}" />
                     <Button Style="{StaticResource Nav.Action}" Content="Discord" Tag="{StaticResource I.Chat}"
                             Command="{Binding OpenDiscordSettingsCommand}" />
                 </StackPanel>

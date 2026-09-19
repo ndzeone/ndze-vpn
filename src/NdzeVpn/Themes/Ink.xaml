@@ -25,7 +25,7 @@
     <SolidColorBrush x:Key="B.Info" Color="#9DB8FF" />
 
     <FontFamily x:Key="F.Main">Segoe UI Variable Text, Segoe UI</FontFamily>
-    <CornerRadius x:Key="R.Panel">12</CornerRadius>
-    <CornerRadius x:Key="R.Card">8</CornerRadius>
+    <CornerRadius x:Key="R.Panel">14</CornerRadius>
+    <CornerRadius x:Key="R.Card">10</CornerRadius>
     <CornerRadius x:Key="R.Pill">500</CornerRadius>
 </ResourceDictionary>

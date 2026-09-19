@@ -1,0 +1,152 @@
+<Window x:Class="NdzeVpn.Views.KeyCheckWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Проверка ключа — Ndze VPN" Icon="/Assets/app.ico"
+        Width="760" Height="660" MinWidth="620" MinHeight="480"
+        WindowStartupLocation="CenterOwner" WindowStyle="None" ResizeMode="CanResize" ShowInTaskbar="True"
+        Background="{DynamicResource B.Window}" Foreground="{DynamicResource B.Fg}"
+        FontFamily="{DynamicResource F.Main}" UseLayoutRounding="True" TextOptions.TextFormattingMode="Ideal">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="48" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0"
+                      UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
+    <Border BorderBrush="{DynamicResource B.Border}" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- header -->
+            <Grid Height="48">
+                <StackPanel Orientation="Horizontal" Margin="24,0,0,0" VerticalAlignment="Center">
+                    <Path Style="{StaticResource Icon}" Data="{StaticResource I.Key}" StrokeThickness="1.7"
+                          Stroke="{DynamicResource B.FgSecondary}" />
+                    <TextBlock Text="Проверка ключа" Style="{StaticResource T.H2}" Margin="10,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+                <Button Style="{StaticResource Btn.CaptionClose}" HorizontalAlignment="Right" VerticalAlignment="Top" Height="48"
+                        Click="Close_Click">
+                    <Path Style="{StaticResource Icon.Caption}" Data="{StaticResource I.WinClose}" />
+                </Button>
+            </Grid>
+
+            <!-- input -->
+            <StackPanel Grid.Row="1" Margin="24,4,24,0">
+                <TextBlock Style="{StaticResource T.Caption}" TextWrapping="Wrap" TextTrimming="None" LineHeight="18"
+                           Text="Вставь ключ vless:// или ссылку подписки — в том числе ссылку из Happ, INCY, Hiddify, v2RayTun или Streisand. Покажу, что внутри, и проверю, отвечают ли серверы." />
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Style="{StaticResource Input.Mono}" Tag="vless://…   https://…   happ://add/…"
+                             Text="{Binding CheckInput, UpdateSourceTrigger=PropertyChanged}"
+                             KeyDown="Input_KeyDown" />
+                    <Button Grid.Column="1" Style="{StaticResource Btn.Outline}" Content="Из буфера" Margin="8,0,0,0" Padding="12,7"
+                            Command="{Binding PasteToCheckCommand}" />
+                    <Button Grid.Column="2" Margin="8,0,0,0" Padding="16,7"
+                            Command="{Binding CheckKeyCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource Btn.Primary}">
+                                <Setter Property="Content" Value="Проверить" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsChecking}" Value="True">
+                                        <Setter Property="Content" Value="Отмена" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </Grid>
+
+                <!-- verdict -->
+                <Border Margin="0,16,0,0" Padding="16,14" CornerRadius="{DynamicResource R.Card}"
+                        BorderThickness="1" BorderBrush="{DynamicResource B.Border}" Background="{DynamicResource B.Panel}"
+                        Visibility="{Binding HasCheckResult, Converter={StaticResource BoolToVis}}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,1,10,0">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Setter Property="Fill" Value="{DynamicResource B.Danger}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding CheckOk}" Value="True">
+                                                <Setter Property="Fill" Value="{DynamicResource B.Success}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+                            <TextBlock Text="{Binding CheckHeadline}" Style="{StaticResource T.H3}" TextWrapping="Wrap" TextTrimming="None" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding CheckDetails}" Style="{StaticResource T.Caption}" Margin="18,6,0,0"
+                                   TextWrapping="Wrap" TextTrimming="None"
+                                   Visibility="{Binding CheckDetails, Converter={StaticResource NullToVis}}" />
+                        <TextBlock Text="{Binding CheckUnsupported}" Style="{StaticResource T.Caption}" Margin="18,6,0,0"
+                                   TextWrapping="Wrap" TextTrimming="None" Foreground="{DynamicResource B.Warning}"
+                                   Visibility="{Binding CheckUnsupported, Converter={StaticResource NullToVis}}" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="{Binding CheckStatus}" Style="{StaticResource T.Caption}" Margin="2,10,0,0"
+                           TextWrapping="Wrap" TextTrimming="None"
+                           Visibility="{Binding CheckStatus, Converter={StaticResource NullToVis}}" />
+            </StackPanel>
+
+            <!-- found nodes -->
+            <TextBlock Grid.Row="2" Style="{StaticResource T.Caption}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       MaxWidth="420" TextAlignment="Center" TextWrapping="Wrap" TextTrimming="None" LineHeight="20"
+                       Visibility="{Binding HasCheckResult, Converter={StaticResource BoolToVisInv}}"
+                       Text="Здесь появятся серверы из ключа: протокол, транспорт и пинг каждого. Ничего не сохранится, пока не нажмёшь «Добавить»." />
+
+            <ListBox Grid.Row="2" Style="{StaticResource List.Plain}" Margin="16,14,16,0" ItemsSource="{Binding CheckedNodes}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Height="40" Margin="8,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="34" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="64" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding CountryCode}" Style="{StaticResource T.Mono}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding CleanName}" Style="{StaticResource T.H3}" VerticalAlignment="Center"
+                                       Margin="0,0,16,0" />
+                            <TextBlock Grid.Column="2" Text="{Binding Protocol}" Style="{StaticResource T.Body}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="3" Text="{Binding Transport}" Style="{StaticResource T.Caption}" FontSize="13"
+                                       VerticalAlignment="Center" Margin="12,0,0,0" ToolTip="{Binding Address}" />
+                            <TextBlock Grid.Column="4" Text="{Binding LatencyMs, Converter={StaticResource LatencyText}}"
+                                       Foreground="{Binding LatencyMs, Converter={StaticResource LatencyBrush}}" FontSize="13"
+                                       HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- footer -->
+            <Border Grid.Row="3" BorderBrush="{DynamicResource B.Border}" BorderThickness="0,1,0,0" Padding="24,12">
+                <Grid>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource T.Caption}" Text="ID устройства для панелей с лимитом устройств" />
+                        <Button Style="{StaticResource Btn.Link}" HorizontalAlignment="Left" Margin="0,2,0,0"
+                                Command="{Binding CopyDeviceIdCommand}" ToolTip="Скопировать">
+                            <TextBlock Text="{Binding DeviceIdText}" FontFamily="{StaticResource F.Mono}" FontSize="11.5"
+                                       TextTrimming="CharacterEllipsis" MaxWidth="330" />
+                        </Button>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button Style="{StaticResource Btn.Outline}" Content="Закрыть" Margin="0,0,10,0" Click="Close_Click" />
+                        <Button Style="{StaticResource Btn.Primary}" Content="Добавить" Command="{Binding AddCheckedCommand}"
+                                IsEnabled="{Binding CheckOk}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

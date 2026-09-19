@@ -141,6 +141,10 @@ public sealed class AppSettings
     /// <summary>Version the user dismissed with "skip"; not offered again at startup.</summary>
     public string? SkippedUpdateVersion { get; set; }
 
+    /// <summary>Device id sent to panels with a device limit. Empty = derived from this computer.
+    /// Set it by hand to reuse the slot another client already registered.</summary>
+    public string DeviceId { get; set; } = "";
+
     // --- Assets ---
     public bool AutoUpdateGeoAssets { get; set; } = true;
     public int GeoAssetUpdateHours { get; set; } = 72;

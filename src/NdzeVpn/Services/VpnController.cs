@@ -490,6 +490,9 @@ public sealed class VpnController : IAsyncDisposable
 
     public Subscription AddSubscription(string url, string? name = null)
     {
+        // A link copied out of Happ / INCY / Hiddify carries the real subscription URL inside it.
+        url = ClientLinks.Unwrap(url.Trim());
+
         var sub = new Subscription
         {
             Url = url.Trim(),
