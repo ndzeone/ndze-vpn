@@ -187,6 +187,40 @@
                 </Border>
                 <Border Style="{StaticResource Row}">
                     <Grid>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Переключать после N неудач подряд" Style="{StaticResource Row.Label}" />
+                            <TextBlock Text="Одна осечка на мобильном интернете — это норма, а не мёртвый сервер" Style="{StaticResource T.Caption}" />
+                        </StackPanel>
+                        <TextBox Style="{StaticResource Input.Mono}" Width="72" HorizontalAlignment="Right"
+                                 Text="{Binding Settings.FailoverFailures, Converter={StaticResource IntStr}}" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <Grid>
+                        <TextBlock Text="Пауза между переключениями, мин" Style="{StaticResource Row.Label}" />
+                        <TextBox Style="{StaticResource Input.Mono}" Width="72" HorizontalAlignment="Right"
+                                 Text="{Binding Settings.FailoverCooldownMinutes, Converter={StaticResource IntStr}}" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <Grid>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Замер скорости: секунд / потоков" Style="{StaticResource Row.Label}" />
+                            <TextBlock Text="Дольше и в несколько потоков — точнее" Style="{StaticResource T.Caption}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <TextBox Style="{StaticResource Input.Mono}" Width="72" Text="{Binding Settings.SpeedTestSeconds, Converter={StaticResource IntStr}}" />
+                            <TextBox Style="{StaticResource Input.Mono}" Width="72" Margin="6,0,0,0" Text="{Binding Settings.SpeedTestStreams, Converter={StaticResource IntStr}}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <CheckBox Style="{StaticResource Toggle.Switch}" IsChecked="{Binding Settings.SpeedTestUpload}">
+                        <TextBlock Text="Замерять и отдачу" Style="{StaticResource Row.Label}" />
+                    </CheckBox>
+                </Border>
+                <Border Style="{StaticResource Row}">
+                    <Grid>
                         <TextBlock Text="Таймаут пинга, мс" Style="{StaticResource Row.Label}" />
                         <TextBox Style="{StaticResource Input.Mono}" Width="72" HorizontalAlignment="Right"
                                  Text="{Binding Settings.LatencyTimeoutMs, Converter={StaticResource IntStr}}" />

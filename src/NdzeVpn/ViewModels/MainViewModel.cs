@@ -161,7 +161,18 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var s in Servers) s.IsActive = IsConnected && s.Id == activeId;
         ActiveServer = Servers.FirstOrDefault(s => s.Id == activeId) ?? Servers.FirstOrDefault();
 
-        PingText = _vpn.RealDelayMs > 0 ? $"{_vpn.RealDelayMs} ms" : "—";
+        PingText = _vpn.RealDelayMs > 0 ? $"{_vpn.RealDelayMs} ms"
+            : ActiveServer?.LatencyMs > 0 ? $"{ActiveServer.LatencyMs} ms"
+            : "—";
+
+        // Failovers and the "admin prompt declined" fallback report themselves through here.
+        if (_vpn.Notice is { Length: > 0 } notice)
+        {
+            _vpn.Notice = null;
+            ShowToast(notice);
+            OnPropertyChanged(nameof(IsTunMode));
+            OnPropertyChanged(nameof(TunnelMode));
+        }
 
         OnPropertyChanged(nameof(IsConnected));
         OnPropertyChanged(nameof(IsBusy));
@@ -787,6 +798,61 @@ public sealed partial class MainViewModel : ObservableObject
         Settings.Smart = new SmartRoutingSettings();
         OnPropertyChanged(nameof(Smart));
         ShowToast("Умная маршрутизация сброшена по умолчанию");
+    }
+
+    // ================================================================== speed test
+
+    [ObservableProperty] private bool _isSpeedTesting;
+    [ObservableProperty] private string _speedTestStage = "";
+    [ObservableProperty] private double _speedTestProgress;
+    [ObservableProperty] private string _downMbps = "—";
+    [ObservableProperty] private string _upMbps = "—";
+    [ObservableProperty] private string? _speedTestSummary;
+    private CancellationTokenSource? _speedCts;
+
+    [RelayCommand]
+    private async Task RunSpeedTest()
+    {
+        if (IsSpeedTesting)
+        {
+            _speedCts?.Cancel();
+            return;
+        }
+
+        IsSpeedTesting = true;
+        SpeedTestProgress = 0;
+        SpeedTestSummary = null;
+        DownMbps = UpMbps = "…";
+        _speedCts = new CancellationTokenSource();
+
+        try
+        {
+            var progress = new Progress<SpeedTestProgress>(p =>
+            {
+                SpeedTestStage = p.Stage;
+                SpeedTestProgress = p.Fraction * 100;
+                if (p.Mbps <= 0) return;
+                if (p.Stage == "Отдача") UpMbps = SpeedTestService.FormatMbps(p.Mbps);
+                else DownMbps = SpeedTestService.FormatMbps(p.Mbps);
+            });
+
+            var result = await _vpn.RunSpeedTestAsync(progress, _speedCts.Token);
+
+            DownMbps = SpeedTestService.FormatMbps(result.DownMbps);
+            UpMbps = SpeedTestService.FormatMbps(result.UpMbps);
+            SpeedTestSummary = result.Ok
+                ? (IsConnected ? "Через VPN" : "Без VPN") + $" · {DateTime.Now:HH:mm}"
+                : result.Error;
+
+            if (!result.Ok) ShowToast(result.Error ?? "Замер не удался");
+            if (result.PingMs > 0) PingText = $"{result.PingMs} ms";
+        }
+        finally
+        {
+            IsSpeedTesting = false;
+            SpeedTestStage = "";
+            SpeedTestProgress = 0;
+        }
     }
 
     [RelayCommand]

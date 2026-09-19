@@ -160,6 +160,61 @@
                     </StackPanel>
                 </UniformGrid>
 
+                <!-- real throughput: parallel streams to a public speed-test endpoint, through the tunnel -->
+                <Border Style="{StaticResource Row}" Margin="0,28,0,0" BorderThickness="0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Скорость" Style="{StaticResource Row.Label}" />
+                            <TextBlock TextTrimming="CharacterEllipsis">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource T.Caption}">
+                                        <Setter Property="Text" Value="{Binding SpeedTestSummary}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SpeedTestSummary}" Value="{x:Null}">
+                                                <Setter Property="Text" Value="Реальный замер загрузки и отдачи" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsSpeedTesting}" Value="True">
+                                                <Setter Property="Text" Value="{Binding SpeedTestStage}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock HorizontalAlignment="Right" FontSize="14" Foreground="{DynamicResource B.Fg}">
+                                <Run Text="↓ " Foreground="{DynamicResource B.FgMuted}" /><Run Text="{Binding DownMbps, Mode=OneWay}" />
+                            </TextBlock>
+                            <TextBlock HorizontalAlignment="Right" FontSize="13" Foreground="{DynamicResource B.FgSecondary}" Margin="0,2,0,0">
+                                <Run Text="↑ " Foreground="{DynamicResource B.FgMuted}" /><Run Text="{Binding UpMbps, Mode=OneWay}" />
+                            </TextBlock>
+                        </StackPanel>
+
+                        <Button Grid.Column="2" Padding="14,7" VerticalAlignment="Center"
+                                Command="{Binding RunSpeedTestCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource Btn.Outline}">
+                                    <Setter Property="Content" Value="Замерить" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSpeedTesting}" Value="True">
+                                            <Setter Property="Content" Value="Остановить" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </Grid>
+                </Border>
+                <ProgressBar Style="{StaticResource Progress.Thin}" Maximum="100" Value="{Binding SpeedTestProgress, Mode=OneWay}"
+                             Visibility="{Binding IsSpeedTesting, Converter={StaticResource BoolToVis}}" Margin="0,-1,0,0" />
+
                 <Rectangle Style="{StaticResource Line}" Margin="0,32,0,6" />
 
                 <!-- mode switches -->

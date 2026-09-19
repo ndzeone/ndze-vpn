@@ -8,7 +8,9 @@ public readonly record struct TrafficSnapshot(
     long UplinkTotal,
     long DownlinkTotal,
     double UploadBytesPerSecond,
-    double DownloadBytesPerSecond);
+    double DownloadBytesPerSecond,
+    long ProxyUplink = 0,
+    long ProxyDownlink = 0);
 
 /// <summary>
 /// Polls Xray's stats endpoint through the bundled CLI (<c>xray api statsquery</c>), which avoids
@@ -22,6 +24,7 @@ public sealed class StatsService : IAsyncDisposable
 
     private long _lastUp, _lastDown;
     private DateTime _lastSample = DateTime.MinValue;
+    private int _failures;
 
     public event EventHandler<TrafficSnapshot>? Updated;
 
@@ -40,6 +43,7 @@ public sealed class StatsService : IAsyncDisposable
         var token = _cts.Token;
 
         _lastUp = _lastDown = 0;
+        _failures = 0;
         _lastSample = DateTime.MinValue;
         SessionUplink = SessionDownlink = 0;
 
@@ -66,10 +70,18 @@ public sealed class StatsService : IAsyncDisposable
 
     private async Task PollAsync(CancellationToken ct)
     {
-        var json = await QueryAsync("outbound>>>proxy>>>traffic", ct);
-        if (json is null) return;
+        // Every outbound, not just the tunnel: with smart routing most bytes leave through "direct",
+        // and a speed readout that ignores them looks broken to the user.
+        var json = await QueryAsync("outbound>>>", ct);
+        if (json is null)
+        {
+            if (++_failures == 5)
+                LogBus.Instance.Warn("stats", "Xray is not answering the stats API; traffic numbers stay at zero");
+            return;
+        }
+        _failures = 0;
 
-        long up = 0, down = 0;
+        long up = 0, down = 0, proxyUp = 0, proxyDown = 0;
 
         using var doc = JsonDocument.Parse(json);
         if (doc.RootElement.TryGetProperty("stat", out var stats) && stats.ValueKind == JsonValueKind.Array)
@@ -79,8 +91,21 @@ public sealed class StatsService : IAsyncDisposable
                 var name = stat.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
                 if (!TryReadValue(stat, out var value)) continue;
 
-                if (name.EndsWith(">>>uplink", StringComparison.Ordinal)) up += value;
-                else if (name.EndsWith(">>>downlink", StringComparison.Ordinal)) down += value;
+                // outbound>>><tag>>>>traffic>>>uplink
+                var parts = name.Split(">>>");
+                var tag = parts.Length > 1 ? parts[1] : "";
+                var isProxy = tag.Equals("proxy", StringComparison.OrdinalIgnoreCase);
+
+                if (name.EndsWith(">>>uplink", StringComparison.Ordinal))
+                {
+                    up += value;
+                    if (isProxy) proxyUp += value;
+                }
+                else if (name.EndsWith(">>>downlink", StringComparison.Ordinal))
+                {
+                    down += value;
+                    if (isProxy) proxyDown += value;
+                }
             }
         }
 
@@ -104,7 +129,7 @@ public sealed class StatsService : IAsyncDisposable
         SessionUplink = up;
         SessionDownlink = down;
 
-        Current = new TrafficSnapshot(up, down, upRate, downRate);
+        Current = new TrafficSnapshot(up, down, upRate, downRate, proxyUp, proxyDown);
         Updated?.Invoke(this, Current);
     }
 

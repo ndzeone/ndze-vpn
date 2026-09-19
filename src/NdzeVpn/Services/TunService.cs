@@ -25,8 +25,20 @@ public sealed class TunService : IDisposable
     private Process? _process;
     private FileSystemWatcher? _logWatcher;
     private long _logOffset;
+    private string? _runningConfig;
 
-    public bool IsRunning => _process is { HasExited: false };
+    public bool IsRunning => _process is { HasExited: false } && IsSingBoxAlive();
+
+    /// <summary>The supervisor outlives a failed sing-box for a moment, so check the adapter itself.</summary>
+    private static bool IsSingBoxAlive()
+    {
+        try { return Process.GetProcessesByName("sing-box").Length > 0; }
+        catch { return true; }
+    }
+
+    /// <summary>True when the adapter is already up with exactly this configuration, so restarting
+    /// it (and asking for administrator rights again) would achieve nothing.</summary>
+    public bool IsRunningWith(AppSettings s) => IsRunning && _runningConfig == BuildConfig(s);
 
     public static bool IsElevated
     {
@@ -134,6 +146,14 @@ public sealed class TunService : IDisposable
 
     public async Task<bool> StartAsync(AppSettings s)
     {
+        // Switching node or editing routing only changes Xray's config; the adapter feeds a fixed
+        // local SOCKS port, so leaving it running avoids a fresh UAC prompt on every reconnect.
+        if (IsRunningWith(s))
+        {
+            LogBus.Instance.Debug("tun", "Adapter already running with this configuration; keeping it");
+            return true;
+        }
+
         Stop();
 
         if (!IsAvailable)
@@ -143,24 +163,27 @@ public sealed class TunService : IDisposable
             return false;
         }
 
+        var config = BuildConfig(s);
+        PromptDeclined = false;
+
         try
         {
             AppPaths.EnsureCreated();
-            await File.WriteAllTextAsync(AppPaths.SingBoxConfigFile, BuildConfig(s));
+            await File.WriteAllTextAsync(AppPaths.SingBoxConfigFile, config);
 
-            var psi = new ProcessStartInfo
-            {
-                FileName = AppPaths.SingBoxExe,
-                WorkingDirectory = AppPaths.CoreDir,
-                // Elevation is required for the adapter; that forces UseShellExecute, which in turn
-                // means no stdout redirect — sing-box logs to a file and we tail it.
-                UseShellExecute = true,
-                Verb = IsElevated ? "" : "runas",
-                CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden,
-                Arguments = $"run -c \"{AppPaths.SingBoxConfigFile}\" -D \"{AppPaths.RuntimeDir}\""
-            };
+            var psi = IsElevated
+                ? new ProcessStartInfo
+                {
+                    FileName = AppPaths.SingBoxExe,
+                    WorkingDirectory = AppPaths.CoreDir,
+                    UseShellExecute = true,
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    Arguments = $"run -c \"{AppPaths.SingBoxConfigFile}\" -D \"{AppPaths.RuntimeDir}\""
+                }
+                : BuildSupervisorStart();
 
+            if (File.Exists(StopFlagFile)) File.Delete(StopFlagFile);
             _process = Process.Start(psi);
             if (_process is null)
             {
@@ -174,20 +197,22 @@ public sealed class TunService : IDisposable
             StartLogTail();
 
             // Give the adapter a moment to come up before the caller reports success.
-            await Task.Delay(1200);
+            await Task.Delay(1800);
 
-            if (_process.HasExited)
+            if (_process.HasExited || !IsSingBoxAlive())
             {
-                LogBus.Instance.Error("tun", $"sing-box exited immediately (code {_process.ExitCode}). Check sing-box.log.");
+                LogBus.Instance.Error("tun", "sing-box exited immediately. Check sing-box.log for the reason.");
                 return false;
             }
 
+            _runningConfig = config;
             LogBus.Instance.Info("tun", $"TUN adapter '{s.TunInterfaceName}' up (pid {_process.Id})");
             return true;
         }
         catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {
             LogBus.Instance.Warn("tun", "Administrator prompt was declined; TUN mode not started.");
+            PromptDeclined = true;
             return false;
         }
         catch (Exception ex)
@@ -197,26 +222,37 @@ public sealed class TunService : IDisposable
         }
     }
 
+    /// <summary>Set when the user clicked "No" on the administrator prompt for the last attempt.</summary>
+    public bool PromptDeclined { get; private set; }
+
     public void Stop()
     {
         StopLogTail();
 
         var proc = _process;
         _process = null;
+        _runningConfig = null;
         if (proc is null) return;
 
         try
         {
-            if (!proc.HasExited)
+            if (proc.HasExited) return;
+
+            // An unelevated process may not terminate an elevated one, so ask the supervisor to do
+            // it: it polls for this file. Asking taskkill instead would pop another UAC prompt.
+            File.WriteAllText(StopFlagFile, DateTime.UtcNow.ToString("O"));
+            if (proc.WaitForExit(6000))
             {
-                proc.Kill(entireProcessTree: true);
-                proc.WaitForExit(5000);
                 LogBus.Instance.Info("tun", "TUN adapter removed");
+                return;
             }
+
+            proc.Kill(entireProcessTree: true);
+            proc.WaitForExit(3000);
+            LogBus.Instance.Info("tun", "TUN adapter removed");
         }
         catch (Exception ex)
         {
-            // An elevated child cannot always be killed from an unelevated parent.
             LogBus.Instance.Warn("tun", $"Could not stop sing-box directly ({ex.Message}); trying taskkill");
             TryTaskKill();
         }
@@ -224,6 +260,67 @@ public sealed class TunService : IDisposable
         {
             proc.Dispose();
         }
+    }
+
+    // ------------------------------------------------------------------ elevated supervisor
+
+    private static string StopFlagFile => Path.Combine(AppPaths.RuntimeDir, "tun-stop");
+    private static string SupervisorScript => Path.Combine(AppPaths.RuntimeDir, "tun-supervisor.ps1");
+
+    /// <summary>
+    /// Runs sing-box elevated, and — still elevated — stops it again when the app asks (stop file)
+    /// or when the app is gone. Without it every disconnect needs a second administrator prompt,
+    /// and a crashed app would leave the adapter behind.
+    /// </summary>
+    private static ProcessStartInfo BuildSupervisorStart()
+    {
+        var script = """
+            param([int]$ParentPid, [string]$Exe, [string]$WorkDir, [string]$Config, [string]$DataDir, [string]$StopFile)
+            $ErrorActionPreference = 'SilentlyContinue'
+            $child = Start-Process -FilePath $Exe -WorkingDirectory $WorkDir -WindowStyle Hidden -PassThru `
+                -ArgumentList @('run', '-c', $Config, '-D', $DataDir)
+            if (-not $child) { exit 1 }
+            while ($true) {
+                Start-Sleep -Milliseconds 400
+                if ($child.HasExited) { break }
+                if (Test-Path $StopFile) { break }
+                if (-not (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue)) { break }
+            }
+            if (-not $child.HasExited) { Stop-Process -Id $child.Id -Force }
+            Remove-Item $StopFile -Force -ErrorAction SilentlyContinue
+            """;
+
+        Directory.CreateDirectory(AppPaths.RuntimeDir);
+        File.WriteAllText(SupervisorScript, script);
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            UseShellExecute = true,
+            Verb = "runas",
+            CreateNoWindow = true,
+            WindowStyle = ProcessWindowStyle.Hidden
+        };
+        psi.ArgumentList.Add("-NoProfile");
+        psi.ArgumentList.Add("-ExecutionPolicy");
+        psi.ArgumentList.Add("Bypass");
+        psi.ArgumentList.Add("-WindowStyle");
+        psi.ArgumentList.Add("Hidden");
+        psi.ArgumentList.Add("-File");
+        psi.ArgumentList.Add(SupervisorScript);
+        psi.ArgumentList.Add("-ParentPid");
+        psi.ArgumentList.Add(Environment.ProcessId.ToString());
+        psi.ArgumentList.Add("-Exe");
+        psi.ArgumentList.Add(AppPaths.SingBoxExe);
+        psi.ArgumentList.Add("-WorkDir");
+        psi.ArgumentList.Add(AppPaths.CoreDir);
+        psi.ArgumentList.Add("-Config");
+        psi.ArgumentList.Add(AppPaths.SingBoxConfigFile);
+        psi.ArgumentList.Add("-DataDir");
+        psi.ArgumentList.Add(AppPaths.RuntimeDir);
+        psi.ArgumentList.Add("-StopFile");
+        psi.ArgumentList.Add(StopFlagFile);
+        return psi;
     }
 
     private static void TryTaskKill()

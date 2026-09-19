@@ -126,6 +126,13 @@ public sealed class AppSettings
     /// <summary>Re-test every node and switch if the active one dies.</summary>
     public bool AutoFailover { get; set; } = true;
     public int FailoverCheckSeconds { get; set; } = 60;
+
+    /// <summary>How many checks in a row must fail before switching node. A single dropped probe on
+    /// a mobile link is normal, and switching on it is what makes a client feel like it "glitches".</summary>
+    public int FailoverFailures { get; set; } = 3;
+
+    /// <summary>Minimum gap between two automatic switches; stops reconnect loops.</summary>
+    public int FailoverCooldownMinutes { get; set; } = 10;
     public string? ActiveProfileId { get; set; }
     public bool SidebarCollapsed { get; set; }
 
@@ -151,4 +158,13 @@ public sealed class AppSettings
     public string LatencyTestUrl { get; set; } = "https://www.gstatic.com/generate_204";
     public int LatencyTimeoutMs { get; set; } = 5000;
     public int LatencyParallelism { get; set; } = 16;
+    /// <summary>TCP handshakes per node; the best one is reported (the first pays for DNS).</summary>
+    public int LatencyProbes { get; set; } = 3;
+
+    // --- Speed test ---
+    /// <summary>Length of the measurement window, excluding ramp-up.</summary>
+    public int SpeedTestSeconds { get; set; } = 8;
+    /// <summary>Parallel streams. One stream rarely saturates a proxied link.</summary>
+    public int SpeedTestStreams { get; set; } = 4;
+    public bool SpeedTestUpload { get; set; } = true;
 }

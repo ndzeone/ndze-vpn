@@ -33,6 +33,11 @@ public sealed class VpnController : IAsyncDisposable
     public TrafficSnapshot Traffic { get; private set; }
     public int RealDelayMs { get; private set; } = -1;
     public string? LastError { get; private set; }
+
+    /// <summary>Last non-fatal thing the user should know about (picked up by the UI as a toast).</summary>
+    public string? Notice { get; set; }
+
+    public SpeedTestResult? LastSpeedTest { get; private set; }
     public IReadOnlyList<string> DroppedGeoSites { get; private set; } = [];
 
     public bool DiscordConnected => _discord.IsConnected;
@@ -82,7 +87,9 @@ public sealed class VpnController : IAsyncDisposable
         await _transition.WaitAsync();
         try
         {
-            if (State == ConnectionState.Connected) await StopCoreAsync();
+            // Reconnecting in TUN mode keeps the adapter: it only feeds a fixed local port, so there
+            // is nothing to rebuild and no second administrator prompt.
+            if (State == ConnectionState.Connected) await StopCoreAsync(keepTun: Settings.Mode == TunnelMode.Tun);
 
             _userRequestedStop = false;
             LastError = null;
@@ -102,11 +109,32 @@ public sealed class VpnController : IAsyncDisposable
 
             if (Settings.Mode == TunnelMode.Tun)
             {
+                // StartAsync is a no-op when the adapter is already up with the same settings, so a
+                // node switch or a routing edit does not raise another administrator prompt.
                 if (!await _tun.StartAsync(Settings))
                 {
-                    _xray.Stop();
-                    Fail("TUN mode failed to start. See Logs — declining the admin prompt also lands here.");
-                    return false;
+                    if (_tun.PromptDeclined)
+                    {
+                        // Do not keep asking. Fall back to the proxy so the connection still works;
+                        // the user can switch back to TUN whenever they want to approve the prompt.
+                        LogBus.Instance.Warn("vpn", "Admin prompt declined; staying on the system proxy this session");
+                        Settings.Mode = TunnelMode.SystemProxy;
+                        Store.SaveSettings();
+                        Notice = "Права администратора не выданы — работаю через системный прокси";
+
+                        if (!_proxy.Apply(Settings.HttpPort))
+                        {
+                            _xray.Stop();
+                            Fail("Could not set the Windows system proxy.");
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        _xray.Stop();
+                        Fail("TUN mode failed to start. See Logs for the sing-box error.");
+                        return false;
+                    }
                 }
             }
             else if (!_proxy.Apply(Settings.HttpPort))
@@ -187,7 +215,7 @@ public sealed class VpnController : IAsyncDisposable
         }
     }
 
-    private async Task StopCoreAsync()
+    private async Task StopCoreAsync(bool keepTun = false)
     {
         if (_stats is not null)
         {
@@ -195,7 +223,7 @@ public sealed class VpnController : IAsyncDisposable
             _stats = null;
         }
 
-        _tun.Stop();
+        if (!keepTun) _tun.Stop();
         _proxy.Clear();
         _xray.Stop();
 
@@ -260,25 +288,41 @@ public sealed class VpnController : IAsyncDisposable
         return true;
     }
 
+    private int _crashRestarts;
+    private DateTime _lastCrash = DateTime.MinValue;
+
     private void OnXrayExited(object? sender, int code)
     {
         if (_userRequestedStop || State != ConnectionState.Connected) return;
 
         LogBus.Instance.Error("vpn", $"Xray died unexpectedly (code {code})");
+        var profile = ActiveProfile;
+
         _ = Task.Run(async () =>
         {
             // Never leave the machine pointed at a dead proxy.
             await _transition.WaitAsync();
-            try { await StopCoreAsync(); }
+            try { await StopCoreAsync(keepTun: Settings.Mode == TunnelMode.Tun); }
             finally { _transition.Release(); }
 
-            Fail("Xray stopped unexpectedly.");
+            // A crash streak means something is really wrong; a crash after hours of uptime is a
+            // one-off. Reset the counter once the connection has been healthy for a while.
+            if (DateTime.UtcNow - _lastCrash > TimeSpan.FromMinutes(10)) _crashRestarts = 0;
+            _lastCrash = DateTime.UtcNow;
+            _crashRestarts++;
 
-            if (Settings.AutoFailover)
+            if (_crashRestarts > 3)
             {
-                await Task.Delay(1500);
-                await FailoverAsync();
+                Fail("Xray keeps stopping. Check the logs — auto-restart is paused.");
+                return;
             }
+
+            // Same node first: restarting the core fixes most crashes and keeps the user in place.
+            await Task.Delay(TimeSpan.FromSeconds(2 * _crashRestarts));
+            if (profile is not null && await ConnectAsync(profile)) return;
+
+            Fail("Xray stopped unexpectedly.");
+            if (Settings.AutoFailover && Store.Profiles.Count > 1) await FailoverAsync();
         });
     }
 
@@ -346,9 +390,82 @@ public sealed class VpnController : IAsyncDisposable
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>Real throughput through the tunnel right now. Heavy on purpose — user-triggered only.</summary>
+    public async Task<SpeedTestResult> RunSpeedTestAsync(IProgress<SpeedTestProgress>? progress, CancellationToken ct = default)
+    {
+        var connected = State == ConnectionState.Connected;
+        var result = await new SpeedTestService().RunAsync(Settings, throughProxy: connected, progress, ct);
+
+        if (result.Ok)
+        {
+            LastSpeedTest = result;
+            if (connected && result.PingMs > 0)
+            {
+                RealDelayMs = result.PingMs;
+                StateChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+        return result;
+    }
+
+    private int _healthFailures;
+    private DateTime _lastFailover = DateTime.MinValue;
+
+    /// <summary>
+    /// Periodic liveness check. Deliberately hard to trigger: the node has to miss
+    /// <see cref="AppSettings.FailoverFailures"/> checks in a row <em>while the machine still has
+    /// internet</em>, and switches are rate-limited. A flaky Wi-Fi, a sleeping laptop or one dropped
+    /// probe must never turn into a reconnect — that is what made the client feel unstable.
+    /// </summary>
+    private async Task MonitorHealthAsync(CancellationToken ct)
+    {
+        var health = await LatencyService.CheckHealthAsync(Settings, ct);
+
+        if (health == TunnelHealth.Ok)
+        {
+            if (_healthFailures > 0) LogBus.Instance.Debug("vpn", "Tunnel responding again");
+            _healthFailures = 0;
+            await MeasureRealDelayAsync();
+            return;
+        }
+
+        if (health == TunnelHealth.NoInternet)
+        {
+            // The computer itself is offline (sleep, Wi-Fi switch, cable out). Sit still.
+            LogBus.Instance.Debug("vpn", "No internet on this machine; leaving the tunnel alone");
+            _healthFailures = 0;
+            return;
+        }
+
+        _healthFailures++;
+        LogBus.Instance.Debug("vpn", $"Tunnel check failed ({_healthFailures}/{Settings.FailoverFailures})");
+
+        if (!Settings.AutoFailover || _healthFailures < Math.Max(1, Settings.FailoverFailures)) return;
+
+        var cooldown = TimeSpan.FromMinutes(Math.Max(1, Settings.FailoverCooldownMinutes));
+        if (DateTime.UtcNow - _lastFailover < cooldown)
+        {
+            LogBus.Instance.Debug("vpn", "Node is unhealthy but a switch happened recently; waiting");
+            return;
+        }
+
+        if (Store.Profiles.Count < 2)
+        {
+            LogBus.Instance.Warn("vpn", "Node is not responding and there is no other node to switch to");
+            _healthFailures = 0;
+            return;
+        }
+
+        LogBus.Instance.Warn("vpn", $"Node missed {_healthFailures} checks in a row; switching");
+        _healthFailures = 0;
+        await FailoverAsync();
+    }
+
     /// <summary>Pick the fastest reachable node other than the one that just failed.</summary>
     private async Task FailoverAsync()
     {
+        _lastFailover = DateTime.UtcNow;
+
         var failed = ActiveProfile?.Id;
         var candidates = Store.Profiles.Where(p => p.Id != failed).ToList();
         if (candidates.Count == 0) return;
@@ -364,6 +481,7 @@ public sealed class VpnController : IAsyncDisposable
         }
 
         LogBus.Instance.Info("vpn", $"Failover: switching to {best.DisplayName} ({best.LatencyMs} ms)");
+        Notice = $"Сервер не отвечал — переключился на {best.DisplayName}";
         await ConnectAsync(best);
         ProfilesChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -456,21 +574,7 @@ public sealed class VpnController : IAsyncDisposable
                         await UpdateSubscriptionAsync(sub, ct);
                 }
 
-                if (State == ConnectionState.Connected && Settings.AutoFailover)
-                {
-                    await MeasureRealDelayAsync();
-                    if (RealDelayMs < 0)
-                    {
-                        // One retry: a single dropped probe is not a dead node.
-                        await Task.Delay(3000, ct);
-                        await MeasureRealDelayAsync();
-                        if (RealDelayMs < 0 && State == ConnectionState.Connected)
-                        {
-                            LogBus.Instance.Warn("vpn", "Active node stopped responding");
-                            await FailoverAsync();
-                        }
-                    }
-                }
+                if (State == ConnectionState.Connected) await MonitorHealthAsync(ct);
             }
         }
         catch (OperationCanceledException) { }

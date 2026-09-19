@@ -154,6 +154,14 @@ var probes = new (string Host, string Expected)[]
 };
 await Task.WhenAll(probes.Select(p => ViaProxy($"https://{p.Host}/", 4)));
 await Task.Delay(800);
+
+// Health check: the node here is deliberately dead while the machine is online, so the monitor must
+// say "tunnel down" and not "no internet" — that distinction is what stops pointless reconnects.
+settings.LatencyTimeoutMs = 4000;
+var health = await LatencyService.CheckHealthAsync(settings);
+Check("dead node reported as TunnelDown, not NoInternet", health == TunnelHealth.TunnelDown, health.ToString());
+Check("real delay through a dead node is -1", await LatencyService.RealDelayAsync(settings) == -1);
+
 xray.Stop();
 
 var logLines = File.Exists(accessLog) ? File.ReadAllLines(accessLog) : [];
@@ -174,8 +182,27 @@ stats.Start(TimeSpan.FromMilliseconds(500));
 await Task.Delay(1800);
 stats.Stop();
 Check("stats API answers", snap is not null, snap is null ? "no sample" : $"up {snap.Value.UplinkTotal} B");
+Check("stats count the direct outbound too", snap?.DownlinkTotal > 0, $"down {snap?.DownlinkTotal} B");
 
 xray.Stop();
+
+// ------------------------------------------------------------------ measurements (no VPN)
+Console.WriteLine("Measurements against the real internet");
+
+Check("machine is online", await LatencyService.IsInternetUpAsync(settings));
+
+var tcp = await LatencyService.TcpPingAsync("ya.ru", 443, 4000);
+Check("TCP ping to a live host is a sane number", tcp is > 0 and < 2000, $"{tcp} ms");
+Check("TCP ping to a closed port fails fast", await LatencyService.TcpPingAsync("127.0.0.1", 9, 1200) == -1);
+
+settings.SpeedTestSeconds = 4;
+settings.SpeedTestStreams = 4;
+settings.SpeedTestUpload = true;
+var speed = await new SpeedTestService().RunAsync(settings, throughProxy: false, null);
+Check("speed test measures a real download", speed.DownMbps > 1, SpeedTestService.FormatMbps(speed.DownMbps));
+// Upload is informational: the public endpoints rate-limit repeated runs from one address, and a
+// throttled speed-test server is not a bug in this app.
+Console.WriteLine($"         upload {SpeedTestService.FormatMbps(speed.UpMbps)}");
 
 Console.WriteLine();
 Console.ForegroundColor = failures == 0 ? ConsoleColor.Green : ConsoleColor.Red;
